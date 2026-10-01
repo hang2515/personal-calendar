@@ -4,7 +4,7 @@
 
 ## 当前进度
 
-已建立 Android 工程和“今天 / 日历 / 我的”三栏导航。现在可以在手机本地创建多个独立的坚持日历，选择每天或指定星期，在当天打卡，编辑名称与今后的重复日期，暂停或恢复日历，并查看各自的月历与完成天数。每个日历可以单独设置计划日提醒时间；到点显示本地通知，点击通知进入对应日历。日历和打卡通过 Room 保存在本机，重复点击同一天不会重复计数；编辑和暂停不会改写过去的日期状态。登录与云同步暂不开发，“我的”显示本机数据和提醒权限状态。
+已建立 Android 工程和“今天 / 日历 / 我的”三栏导航。现在可以在手机本地创建多个独立的坚持日历，选择每天或指定星期，在当天打卡，编辑名称、图标、颜色与今后的重复日期，暂停或恢复日历，并查看各自的月历与完成天数。“今天”展示进度和任务卡片，“日历”提供横向切换与月历预览。每个日历可以单独设置计划日提醒时间；到点显示本地通知，点击通知进入对应日历。日历和打卡通过 Room 保存在本机，重复点击同一天不会重复计数；编辑和暂停不会改写过去的日期状态。登录与云同步暂不开发，“我的”显示本机数据和提醒权限状态。
 
 - [原型与开发计划](docs/开发计划.md)
 - [核心页面原型](docs/prototype/core-screens.png)
@@ -29,7 +29,7 @@
 
 1. 将 `JAVA_HOME` 设置为 JDK 17 或更新版本，将 `ANDROID_HOME` 设置为 Android SDK 目录；不要把本机 SDK 路径写入仓库。Android Studio 通常会自动识别 SDK。
 2. 在仓库根目录运行 `./gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`。生成的 APK 在 `app/build/outputs/apk/debug/app-debug.apk`。如果本机内存紧张，可在命令末尾添加 `--max-workers=1 '-Dorg.gradle.jvmargs=-Xms64m -Xmx512m -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -Dfile.encoding=UTF-8' '-Dorg.gradle.parallel=false' '-Pkotlin.compiler.execution.strategy=in-process'`。
-3. 在 Android Studio 中打开仓库根目录，选择 `app` 运行配置，在模拟器或 Android 8.0 及以上真机运行。
+3. 在 Android Studio 中打开仓库根目录，选择 `app` 运行配置，在模拟器或 Android 8.0 及以上真机运行。当前开发机尚无模拟器或已连接的真机，界面流程已用 Robolectric 本地测试验证，实际屏幕布局和系统提醒仍待设备验收。
 
 首次构建需要联网下载 Gradle 和 AndroidX 依赖。`app/schemas` 中的 Room 数据库结构文件应随模型变更一起提交，以便后续编写数据库迁移。
 

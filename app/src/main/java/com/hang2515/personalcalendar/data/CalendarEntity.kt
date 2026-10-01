@@ -15,6 +15,8 @@ data class CalendarEntity(
     @ColumnInfo(defaultValue = "0") val isPaused: Boolean = false,
     @ColumnInfo(defaultValue = "480") val reminderMinute: Int = 480,
     @ColumnInfo(defaultValue = "0") val reminderEnabled: Boolean = false,
+    @ColumnInfo(defaultValue = "'leaf'") val iconKey: String = "leaf",
+    @ColumnInfo(defaultValue = "'sage'") val colorKey: String = "sage",
 ) {
     fun startLocalDate(): LocalDate = LocalDate.parse(startDate)
 }

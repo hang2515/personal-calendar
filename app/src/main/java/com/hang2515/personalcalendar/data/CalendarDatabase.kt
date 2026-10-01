@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [CalendarEntity::class, CheckInEntity::class, ScheduleChangeEntity::class], version = 3, exportSchema = true)
+@Database(entities = [CalendarEntity::class, CheckInEntity::class, ScheduleChangeEntity::class], version = 4, exportSchema = true)
 abstract class CalendarDatabase : RoomDatabase() {
     abstract fun calendarDao(): CalendarDao
 
@@ -19,7 +19,7 @@ abstract class CalendarDatabase : RoomDatabase() {
                 context.applicationContext,
                 CalendarDatabase::class.java,
                 "personal-calendar-local.db",
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
         }
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -42,6 +42,13 @@ abstract class CalendarDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE calendars ADD COLUMN reminderMinute INTEGER NOT NULL DEFAULT 480")
                 db.execSQL("ALTER TABLE calendars ADD COLUMN reminderEnabled INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE calendars ADD COLUMN iconKey TEXT NOT NULL DEFAULT 'leaf'")
+                db.execSQL("ALTER TABLE calendars ADD COLUMN colorKey TEXT NOT NULL DEFAULT 'sage'")
             }
         }
     }

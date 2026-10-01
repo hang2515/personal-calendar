@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.room.withTransaction
 import com.hang2515.personalcalendar.domain.isScheduled
+import com.hang2515.personalcalendar.domain.CalendarAppearance
 import com.hang2515.personalcalendar.reminders.ReminderScheduler
 import java.time.LocalDate
 import java.time.YearMonth
@@ -37,15 +38,19 @@ class CalendarRepository(
         today: LocalDate,
         reminderMinute: Int = 480,
         reminderEnabled: Boolean = false,
+        iconKey: String = "leaf",
+        colorKey: String = "sage",
     ) {
         require(today == LocalDate.now(clock)) { "日期已变化，请重试" }
         val trimmedName = name.trim()
         require(trimmedName.isNotEmpty() && trimmedName.length <= 40) { "日历名称应为 1 至 40 个字符" }
         require(weekdayMask in 1..127) { "请至少选择一个星期" }
         require(reminderMinute in 0..1439) { "提醒时间无效" }
+        require(iconKey in CalendarAppearance.iconKeys && colorKey in CalendarAppearance.colorKeys) { "日历样式无效" }
         val calendar = CalendarEntity(
             UUID.randomUUID().toString(), trimmedName, today.toString(), weekdayMask,
             reminderMinute = reminderMinute, reminderEnabled = reminderEnabled,
+            iconKey = iconKey, colorKey = colorKey,
         )
         database.withTransaction {
             dao.insertCalendar(calendar)
@@ -61,18 +66,22 @@ class CalendarRepository(
         today: LocalDate,
         reminderMinute: Int,
         reminderEnabled: Boolean,
+        iconKey: String,
+        colorKey: String,
     ) {
         require(today == LocalDate.now(clock)) { "日期已变化，请重试" }
         val trimmedName = name.trim()
         require(trimmedName.isNotEmpty() && trimmedName.length <= 40) { "日历名称应为 1 至 40 个字符" }
         require(weekdayMask in 1..127) { "请至少选择一个星期" }
         require(reminderMinute in 0..1439) { "提醒时间无效" }
+        require(iconKey in CalendarAppearance.iconKeys && colorKey in CalendarAppearance.colorKeys) { "日历样式无效" }
         database.withTransaction {
             val calendar = dao.getCalendar(calendarId) ?: throw IllegalArgumentException("日历不存在")
             if (calendar.name != trimmedName || calendar.weekdayMask != weekdayMask ||
-                calendar.reminderMinute != reminderMinute || calendar.reminderEnabled != reminderEnabled
+                calendar.reminderMinute != reminderMinute || calendar.reminderEnabled != reminderEnabled ||
+                calendar.iconKey != iconKey || calendar.colorKey != colorKey
             ) {
-                check(dao.updateDetails(calendarId, trimmedName, weekdayMask, reminderMinute, reminderEnabled) == 1)
+                check(dao.updateDetails(calendarId, trimmedName, weekdayMask, reminderMinute, reminderEnabled, iconKey, colorKey) == 1)
                 if (!calendar.isPaused && calendar.weekdayMask != weekdayMask) {
                     val effectiveDate = if (dao.hasCheckIn(calendarId, today.toString())) today.plusDays(1) else today
                     dao.upsertScheduleChange(ScheduleChangeEntity(calendarId, effectiveDate.toString(), weekdayMask))

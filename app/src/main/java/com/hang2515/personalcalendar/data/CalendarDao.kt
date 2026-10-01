@@ -8,10 +8,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CalendarDao {
-    @Query("SELECT id, name, startDate, weekdayMask, isPaused, reminderMinute, reminderEnabled FROM calendars ORDER BY name COLLATE NOCASE, id")
+    @Query("SELECT id, name, startDate, weekdayMask, isPaused, reminderMinute, reminderEnabled, iconKey, colorKey FROM calendars ORDER BY name COLLATE NOCASE, id")
     fun observeCalendars(): Flow<List<CalendarEntity>>
 
-    @Query("SELECT id, name, startDate, weekdayMask, isPaused, reminderMinute, reminderEnabled FROM calendars WHERE id = :calendarId")
+    @Query("SELECT id, name, startDate, weekdayMask, isPaused, reminderMinute, reminderEnabled, iconKey, colorKey FROM calendars WHERE id = :calendarId")
     suspend fun getCalendar(calendarId: String): CalendarEntity?
 
     @Query("SELECT id FROM calendars")
@@ -20,8 +20,16 @@ interface CalendarDao {
     @Insert
     suspend fun insertCalendar(calendar: CalendarEntity)
 
-    @Query("UPDATE calendars SET name = :name, weekdayMask = :weekdayMask, reminderMinute = :reminderMinute, reminderEnabled = :reminderEnabled WHERE id = :calendarId")
-    suspend fun updateDetails(calendarId: String, name: String, weekdayMask: Int, reminderMinute: Int, reminderEnabled: Boolean): Int
+    @Query("UPDATE calendars SET name = :name, weekdayMask = :weekdayMask, reminderMinute = :reminderMinute, reminderEnabled = :reminderEnabled, iconKey = :iconKey, colorKey = :colorKey WHERE id = :calendarId")
+    suspend fun updateDetails(
+        calendarId: String,
+        name: String,
+        weekdayMask: Int,
+        reminderMinute: Int,
+        reminderEnabled: Boolean,
+        iconKey: String,
+        colorKey: String,
+    ): Int
 
     @Query("UPDATE calendars SET isPaused = :isPaused WHERE id = :calendarId")
     suspend fun updatePaused(calendarId: String, isPaused: Boolean): Int

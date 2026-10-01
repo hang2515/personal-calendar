@@ -4,13 +4,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,13 +27,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hang2515.personalcalendar.data.CalendarEntity
 import com.hang2515.personalcalendar.data.CalendarRepository
 import com.hang2515.personalcalendar.ui.DatabaseState
 import com.hang2515.personalcalendar.ui.components.InfoCard
+import com.hang2515.personalcalendar.ui.components.CalendarGlyph
+import com.hang2515.personalcalendar.ui.components.ProgressSummary
+import com.hang2515.personalcalendar.ui.components.calendarPalette
 import com.hang2515.personalcalendar.ui.databaseState
+import com.hang2515.personalcalendar.domain.ScheduleChange
+import com.hang2515.personalcalendar.domain.isScheduled
+import com.hang2515.personalcalendar.domain.monthlyProgress
+import com.hang2515.personalcalendar.domain.scheduleMaskOn
 import java.time.LocalDate
+import java.time.YearMonth
 
 @Composable
 fun CalendarScreen(
@@ -97,6 +112,8 @@ fun CalendarScreen(
         }
         else -> CalendarListScreen(
             calendars = calendars,
+            repository = repository,
+            today = today,
             onCreate = { isCreating = true },
             onOpen = { selectedId = it.id },
             modifier = modifier,
@@ -107,10 +124,13 @@ fun CalendarScreen(
 @Composable
 private fun CalendarListScreen(
     calendars: DatabaseState<List<CalendarEntity>>,
+    repository: CalendarRepository,
+    today: LocalDate,
     onCreate: () -> Unit,
     onOpen: (CalendarEntity) -> Unit,
     modifier: Modifier,
 ) {
+    var previewId by rememberSaveable { mutableStateOf<String?>(null) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(24.dp),
@@ -130,19 +150,76 @@ private fun CalendarListScreen(
                 if (calendars.value.isEmpty()) {
                     item { InfoCard("还没有日历", "创建一个属于自己的坚持日历，从今天开始记录。") }
                 }
-                items(calendars.value, key = { it.id }) { calendar ->
-                    Card(onClick = { onOpen(calendar) }, modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(calendar.name, style = MaterialTheme.typography.titleLarge)
-                            Text(if (calendar.isPaused) "已暂停" else scheduleDescription(calendar.weekdayMask))
-                            if (calendar.reminderEnabled) {
-                                Text("提醒 %02d:%02d".format(calendar.reminderMinute / 60, calendar.reminderMinute % 60))
+                if (calendars.value.isNotEmpty()) {
+                    val selectedCalendar = calendars.value.firstOrNull { it.id == previewId } ?: calendars.value.first()
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(calendars.value, key = { it.id }) { calendar ->
+                                val palette = calendarPalette(calendar.colorKey)
+                                val isSelected = calendar.id == selectedCalendar.id
+                                Card(
+                                    onClick = { previewId = calendar.id },
+                                    modifier = Modifier.width(122.dp).height(156.dp).semantics { selected = isSelected },
+                                    border = if (isSelected) BorderStroke(1.dp, palette.accent) else null,
+                                    colors = CardDefaults.cardColors(containerColor = if (isSelected) palette.pale else MaterialTheme.colorScheme.surface),
+                                ) {
+                                    Column(modifier = Modifier.fillMaxSize().padding(12.dp),
+                                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        CalendarGlyph(calendar.iconKey, calendar.colorKey, size = 52.dp)
+                                        Text(calendar.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                                        Text(if (calendar.isPaused) "已暂停" else scheduleDescription(calendar.weekdayMask),
+                                            style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                                    }
+                                }
                             }
-                            Text("查看月历 →", color = MaterialTheme.colorScheme.primary)
                         }
                     }
+                    item { CalendarListPreview(selectedCalendar, repository, today, onOpen = { onOpen(selectedCalendar) }) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CalendarListPreview(
+    calendar: CalendarEntity,
+    repository: CalendarRepository,
+    today: LocalDate,
+    onOpen: () -> Unit,
+) {
+    var monthText by rememberSaveable(calendar.id) { mutableStateOf(YearMonth.from(today).toString()) }
+    val month = YearMonth.parse(monthText)
+    val checkInsFlow = remember(repository, calendar.id, month) { repository.observeCheckInsInMonth(calendar.id, month) }
+    val changesFlow = remember(repository, calendar.id, month) { repository.observeChangesInMonth(calendar.id, month) }
+    val checkIns by databaseState(checkInsFlow)
+    val changes by databaseState(changesFlow)
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onClick = { monthText = month.minusMonths(1).toString() }) { Text("‹") }
+                Text("${month.year}年${month.monthValue}月", style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = { monthText = month.plusMonths(1).toString() }) { Text("›") }
+            }
+            when {
+                checkIns is DatabaseState.Loading || changes is DatabaseState.Loading -> Text("正在读取月历…")
+                checkIns is DatabaseState.Failed || changes is DatabaseState.Failed -> Text("月历暂时无法读取")
+                else -> {
+                    val completedDates = (checkIns as DatabaseState.Ready).value.map { LocalDate.parse(it.localDate) }.toSet()
+                    val ruleChanges = (changes as DatabaseState.Ready).value.map {
+                        ScheduleChange(LocalDate.parse(it.effectiveDate), it.weekdayMask)
+                    }
+                    val progress = monthlyProgress(month, today, completedDates) { date ->
+                        isScheduled(date, calendar.startLocalDate(), scheduleMaskOn(date, ruleChanges))
+                    }
+                    ProgressSummary("${calendar.name} · 本月", progress.completedDays, progress.plannedDays,
+                        accentColor = calendarPalette(calendar.colorKey).accent,
+                        containerColor = calendarPalette(calendar.colorKey).pale)
+                    CalendarMonthGrid(month, today, calendar, ruleChanges, completedDates)
+                }
+            }
+            Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("查看完整日历") }
         }
     }
 }

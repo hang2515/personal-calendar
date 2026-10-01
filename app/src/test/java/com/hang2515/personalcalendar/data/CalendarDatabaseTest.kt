@@ -27,6 +27,36 @@ import java.time.ZoneId
 @Config(sdk = [36])
 class CalendarDatabaseTest {
     @Test
+    fun versionThreeMigrationAddsSavedAppearanceDefaults() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val databaseName = "calendar-v3-migration-test.db"
+        val file = context.getDatabasePath(databaseName)
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
+            old.execSQL("CREATE TABLE calendars(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, startDate TEXT NOT NULL, weekdayMask INTEGER NOT NULL, isPaused INTEGER NOT NULL DEFAULT 0, reminderMinute INTEGER NOT NULL DEFAULT 480, reminderEnabled INTEGER NOT NULL DEFAULT 0)")
+            old.execSQL("CREATE TABLE check_ins(calendarId TEXT NOT NULL, localDate TEXT NOT NULL, PRIMARY KEY(calendarId, localDate), FOREIGN KEY(calendarId) REFERENCES calendars(id) ON DELETE CASCADE)")
+            old.execSQL("CREATE INDEX index_check_ins_localDate ON check_ins(localDate)")
+            old.execSQL("CREATE TABLE schedule_changes(calendarId TEXT NOT NULL, effectiveDate TEXT NOT NULL, weekdayMask INTEGER NOT NULL, PRIMARY KEY(calendarId, effectiveDate), FOREIGN KEY(calendarId) REFERENCES calendars(id) ON DELETE CASCADE)")
+            old.execSQL("INSERT INTO calendars VALUES ('three', '运动', '2026-10-01', 127, 0, 1140, 1)")
+            old.execSQL("INSERT INTO schedule_changes VALUES ('three', '2026-10-01', 127)")
+            old.version = 3
+        }
+        val database = Room.databaseBuilder(context, CalendarDatabase::class.java, databaseName)
+            .addMigrations(CalendarDatabase.MIGRATION_1_2, CalendarDatabase.MIGRATION_2_3, CalendarDatabase.MIGRATION_3_4)
+            .build()
+        try {
+            val calendar = database.calendarDao().getCalendar("three")!!
+            assertEquals("leaf", calendar.iconKey)
+            assertEquals("sage", calendar.colorKey)
+            assertEquals(1140, calendar.reminderMinute)
+            assertTrue(calendar.reminderEnabled)
+        } finally {
+            database.close()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
     fun dueReminderPostsNotificationOnlyBeforeCheckIn() = runBlocking {
         val context = RuntimeEnvironment.getApplication()
         Shadows.shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
@@ -79,7 +109,7 @@ class CalendarDatabaseTest {
             repository.setPaused(calendarId, false, today)
             assertEquals(1, alarms.scheduledAlarms.size)
 
-            repository.editCalendar(calendarId, "阅读", 127, today, 480, false)
+            repository.editCalendar(calendarId, "阅读", 127, today, 480, false, "leaf", "sage")
             assertEquals(0, alarms.scheduledAlarms.size)
         } finally {
             database.close()
@@ -106,8 +136,10 @@ class CalendarDatabaseTest {
             assertEquals(0, dao.getScheduleMaskOn("one", tomorrow.toString()))
 
             repository.setPaused("one", false, today)
-            repository.editCalendar("one", "阅读 20 分钟", 1, today, 480, false)
+            repository.editCalendar("one", "阅读 20 分钟", 1, today, 480, false, "book", "blue")
             assertEquals("阅读 20 分钟", dao.getCalendar("one")?.name)
+            assertEquals("book", dao.getCalendar("one")?.iconKey)
+            assertEquals("blue", dao.getCalendar("one")?.colorKey)
             assertEquals(127, dao.getScheduleMaskOn("one", today.toString()))
             assertEquals(1, dao.getScheduleMaskOn("one", tomorrow.toString()))
         } finally {
@@ -130,7 +162,7 @@ class CalendarDatabaseTest {
             old.version = 1
         }
         val database = Room.databaseBuilder(context, CalendarDatabase::class.java, databaseName)
-            .addMigrations(CalendarDatabase.MIGRATION_1_2, CalendarDatabase.MIGRATION_2_3)
+            .addMigrations(CalendarDatabase.MIGRATION_1_2, CalendarDatabase.MIGRATION_2_3, CalendarDatabase.MIGRATION_3_4)
             .build()
         try {
             val dao = database.calendarDao()
@@ -163,7 +195,7 @@ class CalendarDatabaseTest {
             old.version = 2
         }
         val database = Room.databaseBuilder(context, CalendarDatabase::class.java, databaseName)
-            .addMigrations(CalendarDatabase.MIGRATION_1_2, CalendarDatabase.MIGRATION_2_3)
+            .addMigrations(CalendarDatabase.MIGRATION_1_2, CalendarDatabase.MIGRATION_2_3, CalendarDatabase.MIGRATION_3_4)
             .build()
         try {
             val calendar = database.calendarDao().getCalendar("two")!!
