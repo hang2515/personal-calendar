@@ -36,8 +36,10 @@ private val dateFormatter = DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.
 fun TodayScreen(repository: CalendarRepository, today: LocalDate, modifier: Modifier = Modifier) {
     val calendarsFlow = remember(repository) { repository.observeCalendars() }
     val checkInsFlow = remember(repository, today) { repository.observeCheckInsOn(today) }
+    val schedulesFlow = remember(repository, today) { repository.observeSchedulesOn(today) }
     val calendars by databaseState(calendarsFlow)
     val checkIns by databaseState(checkInsFlow)
+    val schedules by databaseState(schedulesFlow)
     val scope = rememberCoroutineScope()
     var savingId by remember { mutableStateOf<String?>(null) }
     var saveError by remember { mutableStateOf(false) }
@@ -54,14 +56,15 @@ fun TodayScreen(repository: CalendarRepository, today: LocalDate, modifier: Modi
             }
         }
         when {
-            calendars is DatabaseState.Loading || checkIns is DatabaseState.Loading ->
+            calendars is DatabaseState.Loading || checkIns is DatabaseState.Loading || schedules is DatabaseState.Loading ->
                 item { InfoCard("正在读取记录", "稍等片刻。") }
-            calendars is DatabaseState.Failed || checkIns is DatabaseState.Failed ->
+            calendars is DatabaseState.Failed || checkIns is DatabaseState.Failed || schedules is DatabaseState.Failed ->
                 item { InfoCard("记录暂时无法读取", "请重新打开应用后再试。") }
             else -> {
                 val allCalendars = (calendars as DatabaseState.Ready).value
                 val completedIds = (checkIns as DatabaseState.Ready).value.map { it.calendarId }.toSet()
-                val scheduled = allCalendars.filter { isScheduled(today, it.startLocalDate(), it.weekdayMask) }
+                val masks = (schedules as DatabaseState.Ready).value.associate { it.calendarId to it.weekdayMask }
+                val scheduled = allCalendars.filter { isScheduled(today, it.startLocalDate(), masks[it.id] ?: 0) }
                 if (scheduled.isEmpty()) {
                     item {
                         InfoCard(

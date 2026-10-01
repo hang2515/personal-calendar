@@ -34,6 +34,7 @@ fun CalendarScreen(repository: CalendarRepository, today: LocalDate, modifier: M
     val calendarsFlow = remember(repository) { repository.observeCalendars() }
     val calendars by databaseState(calendarsFlow)
     var isCreating by rememberSaveable { mutableStateOf(false) }
+    var isEditing by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
 
     when {
@@ -47,7 +48,25 @@ fun CalendarScreen(repository: CalendarRepository, today: LocalDate, modifier: M
         selectedId != null -> {
             val calendar = (calendars as? DatabaseState.Ready)?.value?.firstOrNull { it.id == selectedId }
             if (calendar != null) {
-                CalendarDetailScreen(calendar, repository, today, onBack = { selectedId = null }, modifier)
+                if (isEditing) {
+                    CreateCalendarScreen(
+                        repository = repository,
+                        today = today,
+                        calendar = calendar,
+                        onBack = { isEditing = false },
+                        onCreated = { isEditing = false },
+                        modifier = modifier,
+                    )
+                } else {
+                    CalendarDetailScreen(
+                        calendar = calendar,
+                        repository = repository,
+                        today = today,
+                        onBack = { selectedId = null },
+                        onEdit = { isEditing = true },
+                        modifier = modifier,
+                    )
+                }
             } else {
                 Column(modifier = modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     TextButton(onClick = { selectedId = null }) { Text("← 返回日历") }
@@ -98,7 +117,7 @@ private fun CalendarListScreen(
                     Card(onClick = { onOpen(calendar) }, modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(calendar.name, style = MaterialTheme.typography.titleLarge)
-                            Text(scheduleDescription(calendar.weekdayMask))
+                            Text(if (calendar.isPaused) "已暂停" else scheduleDescription(calendar.weekdayMask))
                             Text("查看月历 →", color = MaterialTheme.colorScheme.primary)
                         }
                     }

@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hang2515.personalcalendar.data.CalendarRepository
+import com.hang2515.personalcalendar.data.CalendarEntity
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -34,10 +35,13 @@ fun CreateCalendarScreen(
     onBack: () -> Unit,
     onCreated: () -> Unit,
     modifier: Modifier = Modifier,
+    calendar: CalendarEntity? = null,
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var isDaily by rememberSaveable { mutableStateOf(true) }
-    var selectedWeekdays by rememberSaveable { mutableIntStateOf(31) }
+    var name by rememberSaveable(calendar?.id) { mutableStateOf(calendar?.name ?: "") }
+    var isDaily by rememberSaveable(calendar?.id) { mutableStateOf(calendar?.weekdayMask == 127 || calendar == null) }
+    var selectedWeekdays by rememberSaveable(calendar?.id) {
+        mutableIntStateOf(calendar?.weekdayMask?.takeUnless { it == 127 } ?: 31)
+    }
     var isSaving by rememberSaveable { mutableStateOf(false) }
     var saveError by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -48,9 +52,9 @@ fun CreateCalendarScreen(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        TextButton(onClick = onBack) { Text("← 返回日历") }
-        Text("新建坚持日历", style = MaterialTheme.typography.headlineMedium)
-        Text("给想坚持的事一个名字，从今天开始记录。")
+        TextButton(onClick = onBack) { Text(if (calendar == null) "← 返回日历" else "← 返回详情") }
+        Text(if (calendar == null) "新建坚持日历" else "编辑坚持日历", style = MaterialTheme.typography.headlineMedium)
+        Text(if (calendar == null) "给想坚持的事一个名字，从今天开始记录。" else "修改名称和今后的重复日期，过去的记录会保留。")
         OutlinedTextField(
             value = name,
             onValueChange = { name = it; saveError = false },
@@ -85,14 +89,15 @@ fun CreateCalendarScreen(
                 if (selectedWeekdays == 0) Text("请至少选择一个星期", color = MaterialTheme.colorScheme.error)
             }
         }
-        Text("开始日期：${today}")
+        Text(if (calendar == null) "开始日期：${today}" else "今天已打卡时，新规则从明天开始。")
         Button(
             onClick = {
                 isSaving = true
                 saveError = false
                 scope.launch {
                     try {
-                        repository.createCalendar(name, mask, today)
+                        if (calendar == null) repository.createCalendar(name, mask, today)
+                        else repository.editCalendar(calendar.id, name, mask, today)
                         onCreated()
                     } catch (_: Exception) {
                         saveError = true
@@ -103,7 +108,7 @@ fun CreateCalendarScreen(
             },
             enabled = isNameValid && mask != 0 && !isSaving,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (isSaving) "正在保存…" else "创建日历") }
+        ) { Text(if (isSaving) "正在保存…" else if (calendar == null) "创建日历" else "保存修改") }
         if (saveError) Text("日历未保存，请重试。", color = MaterialTheme.colorScheme.error)
     }
 }

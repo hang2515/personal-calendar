@@ -4,7 +4,7 @@
 
 ## 当前进度
 
-已建立 Android 工程和“今天 / 日历 / 我的”三栏导航。现在可以在手机本地创建多个独立的坚持日历，选择每天或指定星期，在当天打卡，并查看各自的月历与完成天数。日历和打卡通过 Room 保存在本机，重复点击同一天不会重复计数。登录、提醒、编辑/暂停日历与云同步还未接入；“我的”目前显示未登录状态。
+已建立 Android 工程和“今天 / 日历 / 我的”三栏导航。现在可以在手机本地创建多个独立的坚持日历，选择每天或指定星期，在当天打卡，编辑名称与今后的重复日期，暂停或恢复日历，并查看各自的月历与完成天数。日历和打卡通过 Room 保存在本机，重复点击同一天不会重复计数；编辑和暂停不会改写过去的日期状态。登录、提醒与云同步还未接入；“我的”目前显示未登录状态。
 
 - [原型与开发计划](docs/开发计划.md)
 - [核心页面原型](docs/prototype/core-screens.png)
@@ -19,7 +19,7 @@
 | [Android Studio](https://developer.android.com/studio/install) | 推荐安装 | 用于编辑、Compose 预览、模拟器和真机调试。使用支持 Android API 37.0 / AGP 9.1.1 的 Panda 3 Patch 1 或更新版本。当前开发机未检测到 Android Studio，但命令行构建可用。 |
 | Android SDK Platform 37.0、Build Tools 36.0.0、Platform Tools | 必需 | 在 Android Studio 的 SDK Manager 中安装；当前开发机已具备。真机调试需 Platform Tools，模拟器另装系统镜像。 |
 | JDK 17 或更新版本 | 必需 | 当前开发机已有 JDK 21；命令行默认仍是 Java 8，构建前必须把 `JAVA_HOME` 指向 JDK 21。 |
-| Gradle、Android Gradle Plugin、Compose Compiler Gradle Plugin、KSP | 自动安装 | 仓库自带 Gradle Wrapper；构建时按工程文件下载 AGP 9.1.1、Compose Compiler、KSP 2.3.12、Room 2.8.5 和 Compose 依赖，无需手动安装 IDE 插件。 |
+| Gradle、Android Gradle Plugin、Compose Compiler Gradle Plugin、KSP | 自动安装 | 仓库自带 Gradle Wrapper；构建时按工程文件下载 AGP 9.1.1、Compose Compiler、KSP 2.3.12、Room 2.8.5 和 Compose 依赖，无需手动安装 IDE 插件。测试还会自动下载 Robolectric 4.17。 |
 | Android Studio 的 Kotlin / Compose 支持 | 随 Studio 提供 | 无需额外下载第三方 Kotlin、Compose 或 Codex 插件。 |
 | Node.js、AWS CLI、AWS CDK | 后端阶段需要 | 当前开发机已有 Node.js 和 AWS CLI；CDK 后续作为项目依赖安装，不要求全局安装。AWS Toolkit IDE 插件可选。 |
 
