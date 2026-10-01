@@ -8,12 +8,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.hang2515.personalcalendar.data.CalendarRepository
 import com.hang2515.personalcalendar.ui.screens.CalendarScreen
 import com.hang2515.personalcalendar.ui.screens.ProfileScreen
 import com.hang2515.personalcalendar.ui.screens.TodayScreen
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlinx.coroutines.delay
 
 private enum class MainTab(val title: String) {
     TODAY("今天"),
@@ -24,6 +31,14 @@ private enum class MainTab(val title: String) {
 @Composable
 fun PersonalCalendarApp() {
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.TODAY) }
+    val context = LocalContext.current
+    val repository = remember { CalendarRepository.open(context) }
+    val today by produceState(initialValue = LocalDate.now(ZoneId.of("Asia/Shanghai"))) {
+        while (true) {
+            value = LocalDate.now(ZoneId.of("Asia/Shanghai"))
+            delay(30_000)
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -41,8 +56,8 @@ fun PersonalCalendarApp() {
     ) { contentPadding ->
         val modifier = Modifier.padding(contentPadding)
         when (selectedTab) {
-            MainTab.TODAY -> TodayScreen(modifier)
-            MainTab.CALENDARS -> CalendarScreen(modifier)
+            MainTab.TODAY -> TodayScreen(repository, today, modifier)
+            MainTab.CALENDARS -> CalendarScreen(repository, today, modifier)
             MainTab.PROFILE -> ProfileScreen(modifier)
         }
     }
