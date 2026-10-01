@@ -121,6 +121,24 @@ class CalendarRepository(
         return inserted
     }
 
+    suspend fun undoCheckIn(calendarId: String, today: LocalDate): Boolean {
+        val deleted = database.withTransaction {
+            require(today == LocalDate.now(clock)) { "只能撤销今天的打卡" }
+            dao.deleteCheckIn(calendarId, today.toString()) == 1
+        }
+        if (deleted) refreshReminder(calendarId)
+        return deleted
+    }
+
+    suspend fun deleteCalendar(calendarId: String): Boolean {
+        val deleted = database.withTransaction { dao.deleteCalendar(calendarId) == 1 }
+        if (deleted) {
+            reminderScheduler?.dismissNotification(calendarId)
+            refreshReminder(calendarId)
+        }
+        return deleted
+    }
+
     private suspend fun refreshReminder(calendarId: String) {
         try {
             reminderScheduler?.refresh(calendarId)

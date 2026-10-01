@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -57,6 +58,7 @@ fun CalendarDetailScreen(
     today: LocalDate,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onDeleted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var monthText by rememberSaveable(calendar.id) { mutableStateOf(YearMonth.from(today).toString()) }
@@ -69,6 +71,8 @@ fun CalendarDetailScreen(
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf(false) }
     var isChangingPause by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var isDeleting by remember { mutableStateOf(false) }
     val palette = calendarPalette(calendar.colorKey)
 
     Column(
@@ -105,6 +109,7 @@ fun CalendarDetailScreen(
                 enabled = !isChangingPause,
             ) { Text(if (calendar.isPaused) "恢复日历" else "暂停日历") }
         }
+        TextButton(onClick = { showDeleteConfirmation = true }) { Text("删除日历", color = MaterialTheme.colorScheme.error) }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { monthText = month.minusMonths(1).toString() }) { Text("‹ 上月") }
             Text("${month.year}年${month.monthValue}月", style = MaterialTheme.typography.titleLarge)
@@ -131,6 +136,22 @@ fun CalendarDetailScreen(
                 if (YearMonth.from(today) == month && isScheduled(today, calendar.startLocalDate(), scheduleMaskOn(today, ruleChanges))) {
                     if (today in completedDates) {
                         InfoCard("今天已完成", "这一天的坚持已经记录。")
+                        TextButton(
+                            onClick = {
+                                isSaving = true
+                                saveError = false
+                                scope.launch {
+                                    try {
+                                        repository.undoCheckIn(calendar.id, today)
+                                    } catch (_: Exception) {
+                                        saveError = true
+                                    } finally {
+                                        isSaving = false
+                                    }
+                                }
+                            },
+                            enabled = !isSaving,
+                        ) { Text("撤销今日打卡") }
                     } else {
                         Button(
                             onClick = {
@@ -153,7 +174,38 @@ fun CalendarDetailScreen(
                 }
             }
         }
-        if (saveError) Text("打卡未保存，请重试。", color = MaterialTheme.colorScheme.error)
+        if (saveError) Text("操作未完成，请重试。", color = MaterialTheme.colorScheme.error)
+    }
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (!isDeleting) showDeleteConfirmation = false },
+            title = { Text("删除“${calendar.name}”？") },
+            text = { Text("这会永久删除这个日历、历史规则和全部打卡记录，无法撤销。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isDeleting = true
+                        scope.launch {
+                            try {
+                                if (repository.deleteCalendar(calendar.id)) {
+                                    showDeleteConfirmation = false
+                                    onDeleted()
+                                } else {
+                                    saveError = true
+                                }
+                            } catch (_: Exception) {
+                                saveError = true
+                            } finally {
+                                isDeleting = false
+                                showDeleteConfirmation = false
+                            }
+                        }
+                    },
+                    enabled = !isDeleting,
+                ) { Text("确认删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }, enabled = !isDeleting) { Text("取消") } },
+        )
     }
 }
 

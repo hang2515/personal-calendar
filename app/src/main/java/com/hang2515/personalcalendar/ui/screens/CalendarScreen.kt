@@ -96,6 +96,7 @@ fun CalendarScreen(
                         today = today,
                         onBack = { selectedId = null },
                         onEdit = { isEditing = true },
+                        onDeleted = { selectedId = null },
                         modifier = modifier,
                     )
                 }

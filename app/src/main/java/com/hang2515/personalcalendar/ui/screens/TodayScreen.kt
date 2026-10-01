@@ -17,6 +17,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -125,6 +126,22 @@ fun TodayScreen(repository: CalendarRepository, today: LocalDate, modifier: Modi
                                 }
                                 if (calendar.id in completedIds) {
                                     Text("今天已完成", color = palette.accent, style = MaterialTheme.typography.labelLarge)
+                                    TextButton(
+                                        onClick = {
+                                            savingId = calendar.id
+                                            saveError = false
+                                            scope.launch {
+                                                try {
+                                                    repository.undoCheckIn(calendar.id, today)
+                                                } catch (_: Exception) {
+                                                    saveError = true
+                                                } finally {
+                                                    savingId = null
+                                                }
+                                            }
+                                        },
+                                        enabled = savingId == null,
+                                    ) { Text("撤销打卡") }
                                 } else {
                                     Button(
                                         onClick = {
@@ -150,6 +167,6 @@ fun TodayScreen(repository: CalendarRepository, today: LocalDate, modifier: Modi
                 }
             }
         }
-        if (saveError) item { Text("打卡未保存，请重试。", color = MaterialTheme.colorScheme.error) }
+        if (saveError) item { Text("打卡操作未完成，请重试。", color = MaterialTheme.colorScheme.error) }
     }
 }

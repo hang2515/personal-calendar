@@ -20,7 +20,7 @@ class CalendarFlowTest {
     @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun newCalendarAppearsTodayAndCanBeCheckedIn() {
+    fun calendarCanBeCreatedCheckedInUndoneAndDeleted() {
         composeRule.onNodeWithText("日历").performClick()
         composeRule.onNodeWithText("＋ 新建日历").performClick()
         composeRule.onNode(hasSetTextAction()).performTextInput("阅读")
@@ -35,6 +35,17 @@ class CalendarFlowTest {
         composeRule.onNodeWithText("完成打卡").performClick()
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithText("今天已完成").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("撤销打卡").performScrollTo().performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("完成打卡").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("日历").performClick()
+        composeRule.onNodeWithText("查看完整日历").performScrollTo().performClick()
+        composeRule.onNodeWithText("删除日历").performClick()
+        composeRule.onNodeWithText("确认删除").performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("还没有日历").fetchSemanticsNodes().isNotEmpty()
         }
     }
 }

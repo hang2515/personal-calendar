@@ -60,4 +60,10 @@ interface CalendarDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertCheckIn(checkIn: CheckInEntity): Long
+
+    @Query("DELETE FROM check_ins WHERE calendarId = :calendarId AND localDate = :date")
+    suspend fun deleteCheckIn(calendarId: String, date: String): Int
+
+    @Query("DELETE FROM calendars WHERE id = :calendarId")
+    suspend fun deleteCalendar(calendarId: String): Int
 }

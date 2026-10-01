@@ -117,6 +117,54 @@ class CalendarDatabaseTest {
     }
 
     @Test
+    fun undoTodayCheckInRestoresPendingReminderAndIsIdempotent() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        Shadows.shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val database = Room.inMemoryDatabaseBuilder(context, CalendarDatabase::class.java).build()
+        val today = LocalDate.of(2026, 10, 1)
+        val clock = Clock.fixed(Instant.parse("2026-09-30T23:30:00Z"), ZoneId.of("Asia/Shanghai"))
+        val scheduler = ReminderScheduler(context, database, clock)
+        val repository = CalendarRepository(database, clock, scheduler)
+        val alarms = Shadows.shadowOf(context.getSystemService(AlarmManager::class.java))
+        try {
+            repository.createCalendar("阅读", 127, today, 540, true)
+            val id = database.calendarDao().observeCalendars().first().single().id
+            assertTrue(repository.checkIn(id, today))
+            assertTrue(repository.undoCheckIn(id, today))
+            assertFalse(repository.undoCheckIn(id, today))
+            assertFalse(database.calendarDao().hasCheckIn(id, today.toString()))
+            assertEquals(1, alarms.scheduledAlarms.size)
+            assertEquals(today.atTime(9, 0).atZone(clock.zone).toInstant().toEpochMilli(), alarms.scheduledAlarms.single().triggerAtMs)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun deletingCalendarRemovesHistoryAndReminder() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        Shadows.shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val database = Room.inMemoryDatabaseBuilder(context, CalendarDatabase::class.java).build()
+        val today = LocalDate.of(2026, 10, 1)
+        val clock = Clock.fixed(Instant.parse("2026-09-30T23:00:00Z"), ZoneId.of("Asia/Shanghai"))
+        val repository = CalendarRepository(database, clock, ReminderScheduler(context, database, clock))
+        val alarms = Shadows.shadowOf(context.getSystemService(AlarmManager::class.java))
+        try {
+            repository.createCalendar("误建日历", 127, today, 540, true)
+            val id = database.calendarDao().observeCalendars().first().single().id
+            repository.checkIn(id, today)
+            assertTrue(repository.deleteCalendar(id))
+            assertFalse(repository.deleteCalendar(id))
+            assertEquals(null, database.calendarDao().getCalendar(id))
+            assertFalse(database.calendarDao().hasCheckIn(id, today.toString()))
+            assertEquals(null, database.calendarDao().getScheduleMaskOn(id, today.toString()))
+            assertEquals(0, alarms.scheduledAlarms.size)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
     fun completedDayStaysPlannedWhenPausedAndEditedLaterThatDay() = runBlocking {
         val context = RuntimeEnvironment.getApplication()
         val database = Room.inMemoryDatabaseBuilder(context, CalendarDatabase::class.java).build()
