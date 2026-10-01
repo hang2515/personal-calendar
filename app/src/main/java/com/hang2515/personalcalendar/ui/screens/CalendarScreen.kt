@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,17 +31,32 @@ import com.hang2515.personalcalendar.ui.databaseState
 import java.time.LocalDate
 
 @Composable
-fun CalendarScreen(repository: CalendarRepository, today: LocalDate, modifier: Modifier = Modifier) {
+fun CalendarScreen(
+    repository: CalendarRepository,
+    today: LocalDate,
+    openCalendarId: String?,
+    openRequest: Int,
+    permissionRevision: Int,
+    modifier: Modifier = Modifier,
+) {
     val calendarsFlow = remember(repository) { repository.observeCalendars() }
     val calendars by databaseState(calendarsFlow)
     var isCreating by rememberSaveable { mutableStateOf(false) }
     var isEditing by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(openRequest) {
+        if (openCalendarId != null) {
+            selectedId = openCalendarId
+            isCreating = false
+            isEditing = false
+        }
+    }
 
     when {
         isCreating -> CreateCalendarScreen(
             repository = repository,
             today = today,
+            permissionRevision = permissionRevision,
             onBack = { isCreating = false },
             onCreated = { isCreating = false },
             modifier = modifier,
@@ -53,6 +69,7 @@ fun CalendarScreen(repository: CalendarRepository, today: LocalDate, modifier: M
                         repository = repository,
                         today = today,
                         calendar = calendar,
+                        permissionRevision = permissionRevision,
                         onBack = { isEditing = false },
                         onCreated = { isEditing = false },
                         modifier = modifier,
@@ -118,6 +135,9 @@ private fun CalendarListScreen(
                         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(calendar.name, style = MaterialTheme.typography.titleLarge)
                             Text(if (calendar.isPaused) "已暂停" else scheduleDescription(calendar.weekdayMask))
+                            if (calendar.reminderEnabled) {
+                                Text("提醒 %02d:%02d".format(calendar.reminderMinute / 60, calendar.reminderMinute % 60))
+                            }
                             Text("查看月历 →", color = MaterialTheme.colorScheme.primary)
                         }
                     }

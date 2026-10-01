@@ -8,17 +8,20 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CalendarDao {
-    @Query("SELECT id, name, startDate, weekdayMask, isPaused FROM calendars ORDER BY name COLLATE NOCASE, id")
+    @Query("SELECT id, name, startDate, weekdayMask, isPaused, reminderMinute, reminderEnabled FROM calendars ORDER BY name COLLATE NOCASE, id")
     fun observeCalendars(): Flow<List<CalendarEntity>>
 
-    @Query("SELECT id, name, startDate, weekdayMask, isPaused FROM calendars WHERE id = :calendarId")
+    @Query("SELECT id, name, startDate, weekdayMask, isPaused, reminderMinute, reminderEnabled FROM calendars WHERE id = :calendarId")
     suspend fun getCalendar(calendarId: String): CalendarEntity?
+
+    @Query("SELECT id FROM calendars")
+    suspend fun getCalendarIds(): List<String>
 
     @Insert
     suspend fun insertCalendar(calendar: CalendarEntity)
 
-    @Query("UPDATE calendars SET name = :name, weekdayMask = :weekdayMask WHERE id = :calendarId")
-    suspend fun updateDetails(calendarId: String, name: String, weekdayMask: Int): Int
+    @Query("UPDATE calendars SET name = :name, weekdayMask = :weekdayMask, reminderMinute = :reminderMinute, reminderEnabled = :reminderEnabled WHERE id = :calendarId")
+    suspend fun updateDetails(calendarId: String, name: String, weekdayMask: Int, reminderMinute: Int, reminderEnabled: Boolean): Int
 
     @Query("UPDATE calendars SET isPaused = :isPaused WHERE id = :calendarId")
     suspend fun updatePaused(calendarId: String, isPaused: Boolean): Int
@@ -34,6 +37,9 @@ interface CalendarDao {
 
     @Query("SELECT calendarId, effectiveDate, weekdayMask FROM schedule_changes WHERE calendarId = :calendarId AND (effectiveDate BETWEEN :from AND :through OR effectiveDate = (SELECT MAX(previous.effectiveDate) FROM schedule_changes AS previous WHERE previous.calendarId = :calendarId AND previous.effectiveDate < :from)) ORDER BY effectiveDate")
     fun observeChangesInMonth(calendarId: String, from: String, through: String): Flow<List<ScheduleChangeEntity>>
+
+    @Query("SELECT calendarId, effectiveDate, weekdayMask FROM schedule_changes WHERE calendarId = :calendarId AND (effectiveDate BETWEEN :from AND :through OR effectiveDate = (SELECT MAX(previous.effectiveDate) FROM schedule_changes AS previous WHERE previous.calendarId = :calendarId AND previous.effectiveDate < :from)) ORDER BY effectiveDate")
+    suspend fun getChangesInRange(calendarId: String, from: String, through: String): List<ScheduleChangeEntity>
 
     @Query("SELECT EXISTS(SELECT 1 FROM check_ins WHERE calendarId = :calendarId AND localDate = :date)")
     suspend fun hasCheckIn(calendarId: String, date: String): Boolean

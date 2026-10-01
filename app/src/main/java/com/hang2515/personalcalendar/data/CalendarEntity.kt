@@ -13,6 +13,8 @@ data class CalendarEntity(
     val startDate: String,
     val weekdayMask: Int,
     @ColumnInfo(defaultValue = "0") val isPaused: Boolean = false,
+    @ColumnInfo(defaultValue = "480") val reminderMinute: Int = 480,
+    @ColumnInfo(defaultValue = "0") val reminderEnabled: Boolean = false,
 ) {
     fun startLocalDate(): LocalDate = LocalDate.parse(startDate)
 }

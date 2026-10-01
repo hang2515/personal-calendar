@@ -10,14 +10,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hang2515.personalcalendar.ui.components.InfoCard
+import com.hang2515.personalcalendar.ui.components.ReminderPermissionCard
 
 @Composable
-fun ProfileScreen(modifier: Modifier = Modifier) {
+fun ProfileScreen(permissionRevision: Int, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Text("我的", style = MaterialTheme.typography.headlineMedium)
-        InfoCard("尚未登录", "登录后可以在不同设备之间同步坚持记录。")
+        InfoCard("本机记录", "日历与打卡目前只保存在这部手机，卸载应用或清除数据会失去记录。")
+        ReminderPermissionCard(permissionRevision)
     }
 }

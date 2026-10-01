@@ -69,6 +69,9 @@ fun CalendarDetailScreen(
         TextButton(onClick = onBack) { Text("← 返回日历") }
         Text(calendar.name, style = MaterialTheme.typography.headlineMedium)
         Text(if (calendar.isPaused) "已暂停 · 后续日期不安排打卡" else scheduleDescription(calendar.weekdayMask))
+        if (calendar.reminderEnabled) {
+            Text("计划日 %02d:%02d 提醒".format(calendar.reminderMinute / 60, calendar.reminderMinute % 60))
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = onEdit) { Text("编辑日历") }
             TextButton(

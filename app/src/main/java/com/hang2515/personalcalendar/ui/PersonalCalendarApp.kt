@@ -6,6 +6,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -29,8 +30,8 @@ private enum class MainTab(val title: String) {
 }
 
 @Composable
-fun PersonalCalendarApp() {
-    var selectedTab by rememberSaveable { mutableStateOf(MainTab.TODAY) }
+fun PersonalCalendarApp(openCalendarId: String?, openRequest: Int, permissionRevision: Int) {
+    var selectedTab by rememberSaveable { mutableStateOf(if (openCalendarId == null) MainTab.TODAY else MainTab.CALENDARS) }
     val context = LocalContext.current
     val repository = remember { CalendarRepository.open(context) }
     val today by produceState(initialValue = LocalDate.now(ZoneId.of("Asia/Shanghai"))) {
@@ -38,6 +39,9 @@ fun PersonalCalendarApp() {
             value = LocalDate.now(ZoneId.of("Asia/Shanghai"))
             delay(30_000)
         }
+    }
+    LaunchedEffect(openRequest) {
+        if (openCalendarId != null) selectedTab = MainTab.CALENDARS
     }
 
     Scaffold(
@@ -57,8 +61,8 @@ fun PersonalCalendarApp() {
         val modifier = Modifier.padding(contentPadding)
         when (selectedTab) {
             MainTab.TODAY -> TodayScreen(repository, today, modifier)
-            MainTab.CALENDARS -> CalendarScreen(repository, today, modifier)
-            MainTab.PROFILE -> ProfileScreen(modifier)
+            MainTab.CALENDARS -> CalendarScreen(repository, today, openCalendarId, openRequest, permissionRevision, modifier)
+            MainTab.PROFILE -> ProfileScreen(permissionRevision, modifier)
         }
     }
 }

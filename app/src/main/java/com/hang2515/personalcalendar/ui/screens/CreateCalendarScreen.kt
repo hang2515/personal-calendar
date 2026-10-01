@@ -1,5 +1,6 @@
 package com.hang2515.personalcalendar.ui.screens
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,9 +25,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.hang2515.personalcalendar.data.CalendarRepository
 import com.hang2515.personalcalendar.data.CalendarEntity
+import com.hang2515.personalcalendar.ui.components.ReminderPermissionCard
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -36,6 +41,7 @@ fun CreateCalendarScreen(
     onCreated: () -> Unit,
     modifier: Modifier = Modifier,
     calendar: CalendarEntity? = null,
+    permissionRevision: Int = 0,
 ) {
     var name by rememberSaveable(calendar?.id) { mutableStateOf(calendar?.name ?: "") }
     var isDaily by rememberSaveable(calendar?.id) { mutableStateOf(calendar?.weekdayMask == 127 || calendar == null) }
@@ -44,6 +50,9 @@ fun CreateCalendarScreen(
     }
     var isSaving by rememberSaveable { mutableStateOf(false) }
     var saveError by rememberSaveable { mutableStateOf(false) }
+    var reminderMinute by rememberSaveable(calendar?.id) { mutableIntStateOf(calendar?.reminderMinute ?: 480) }
+    var reminderEnabled by rememberSaveable(calendar?.id) { mutableStateOf(calendar?.reminderEnabled ?: false) }
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val mask = if (isDaily) 127 else selectedWeekdays
     val isNameValid = name.trim().isNotEmpty() && name.trim().length <= 40
@@ -89,6 +98,24 @@ fun CreateCalendarScreen(
                 if (selectedWeekdays == 0) Text("请至少选择一个星期", color = MaterialTheme.colorScheme.error)
             }
         }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("计划日提醒", style = MaterialTheme.typography.titleMedium)
+                Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
+            }
+            if (reminderEnabled) {
+                OutlinedButton(onClick = {
+                    TimePickerDialog(
+                        context,
+                        { _, hour, minute -> reminderMinute = hour * 60 + minute },
+                        reminderMinute / 60,
+                        reminderMinute % 60,
+                        true,
+                    ).show()
+                }) { Text("提醒时间：%02d:%02d".format(reminderMinute / 60, reminderMinute % 60)) }
+                ReminderPermissionCard(permissionRevision)
+            }
+        }
         Text(if (calendar == null) "开始日期：${today}" else "今天已打卡时，新规则从明天开始。")
         Button(
             onClick = {
@@ -96,8 +123,8 @@ fun CreateCalendarScreen(
                 saveError = false
                 scope.launch {
                     try {
-                        if (calendar == null) repository.createCalendar(name, mask, today)
-                        else repository.editCalendar(calendar.id, name, mask, today)
+                        if (calendar == null) repository.createCalendar(name, mask, today, reminderMinute, reminderEnabled)
+                        else repository.editCalendar(calendar.id, name, mask, today, reminderMinute, reminderEnabled)
                         onCreated()
                     } catch (_: Exception) {
                         saveError = true
