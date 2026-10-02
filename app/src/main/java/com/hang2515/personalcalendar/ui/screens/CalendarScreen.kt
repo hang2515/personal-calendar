@@ -132,6 +132,8 @@ private fun CalendarListScreen(
     modifier: Modifier,
 ) {
     var previewId by rememberSaveable { mutableStateOf<String?>(null) }
+    val progressFlow = remember(repository, today) { repository.observeMonthlyProgress(today) }
+    val progressByCalendar by databaseState(progressFlow)
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(24.dp),
@@ -160,17 +162,23 @@ private fun CalendarListScreen(
                                 val isSelected = calendar.id == selectedCalendar.id
                                 Card(
                                     onClick = { previewId = calendar.id },
-                                    modifier = Modifier.width(122.dp).height(156.dp).semantics { selected = isSelected },
+                                    modifier = Modifier.width(144.dp).semantics { selected = isSelected },
                                     border = if (isSelected) BorderStroke(1.dp, palette.accent) else null,
                                     colors = CardDefaults.cardColors(containerColor = if (isSelected) palette.pale else MaterialTheme.colorScheme.surface),
                                 ) {
-                                    Column(modifier = Modifier.fillMaxSize().padding(12.dp),
+                                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp),
                                         horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         CalendarGlyph(calendar.iconKey, calendar.colorKey, size = 52.dp)
                                         Text(calendar.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                                         Text(if (calendar.isPaused) "已暂停" else scheduleDescription(calendar.weekdayMask),
                                             style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                                        val progress = (progressByCalendar as? DatabaseState.Ready)?.value?.get(calendar.id)
+                                        Text(when {
+                                            progress != null -> "本月 ${progress.completedDays} / ${progress.plannedDays} 天"
+                                            progressByCalendar is DatabaseState.Failed -> "统计暂不可用"
+                                            else -> "统计读取中…"
+                                        }, style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
                             }
@@ -218,6 +226,7 @@ private fun CalendarListPreview(
                         accentColor = calendarPalette(calendar.colorKey).accent,
                         containerColor = calendarPalette(calendar.colorKey).pale)
                     CalendarMonthGrid(month, today, calendar, ruleChanges, completedDates)
+                    CalendarStatusLegend()
                 }
             }
             Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("查看完整日历") }

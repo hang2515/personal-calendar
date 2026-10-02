@@ -12,3 +12,7 @@ node_modules/
 cdk.out/
 .env
 .env.*
+cloud-config.properties
+cloud/deployment-outputs*.json
+hs_err_pid*.log
+replay_pid*.log

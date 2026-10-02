@@ -8,6 +8,27 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CalendarDao {
+    @Query("SELECT id, name, startDate, weekdayMask, isPaused, reminderMinute, reminderEnabled, iconKey, colorKey FROM calendars ORDER BY id LIMIT 1001")
+    suspend fun exportCalendars(): List<CalendarEntity>
+
+    @Query("SELECT calendarId, effectiveDate, weekdayMask FROM schedule_changes ORDER BY calendarId, effectiveDate LIMIT 10001")
+    suspend fun exportChanges(): List<ScheduleChangeEntity>
+
+    @Query("SELECT calendarId, localDate FROM check_ins ORDER BY calendarId, localDate LIMIT 10001")
+    suspend fun exportCheckIns(): List<CheckInEntity>
+
+    @Query("DELETE FROM calendars WHERE id IN (:ids)")
+    suspend fun deleteCalendars(ids: List<String>): Int
+
+    @Insert
+    suspend fun insertCalendars(calendars: List<CalendarEntity>)
+
+    @Insert
+    suspend fun insertChanges(changes: List<ScheduleChangeEntity>)
+
+    @Insert
+    suspend fun insertCheckIns(checkIns: List<CheckInEntity>)
+
     @Query("SELECT id, name, startDate, weekdayMask, isPaused, reminderMinute, reminderEnabled, iconKey, colorKey FROM calendars ORDER BY name COLLATE NOCASE, id")
     fun observeCalendars(): Flow<List<CalendarEntity>>
 
@@ -63,6 +84,25 @@ interface CalendarDao {
 
     @Query("SELECT calendarId, localDate FROM check_ins WHERE calendarId = :calendarId AND localDate BETWEEN :from AND :through")
     fun observeCheckInsInMonth(calendarId: String, from: String, through: String): Flow<List<CheckInEntity>>
+
+    @Query("SELECT calendarId, localDate FROM check_ins WHERE localDate BETWEEN :from AND :through")
+    fun observeAllCheckInsInMonth(from: String, through: String): Flow<List<CheckInEntity>>
+
+    // 一次读取月内变更及各日历月初生效规则，列表统计不逐个日历查询。
+    @Query("""
+        WITH previous AS (
+            SELECT calendarId, MAX(effectiveDate) AS effectiveDate
+            FROM schedule_changes WHERE effectiveDate < :from GROUP BY calendarId
+        )
+        SELECT changes.calendarId, changes.effectiveDate, changes.weekdayMask
+        FROM schedule_changes AS changes INNER JOIN previous
+        ON changes.calendarId = previous.calendarId AND changes.effectiveDate = previous.effectiveDate
+        UNION ALL
+        SELECT calendarId, effectiveDate, weekdayMask FROM schedule_changes
+        WHERE effectiveDate BETWEEN :from AND :through
+        ORDER BY calendarId, effectiveDate
+    """)
+    fun observeAllChangesInMonth(from: String, through: String): Flow<List<ScheduleChangeEntity>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertCheckIn(checkIn: CheckInEntity): Long

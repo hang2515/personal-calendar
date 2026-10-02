@@ -12,11 +12,16 @@ import java.time.ZoneId
 import java.time.Clock
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.combine
+import com.hang2515.personalcalendar.domain.ScheduleChange
+import com.hang2515.personalcalendar.domain.monthlyProgress
+import com.hang2515.personalcalendar.domain.scheduleMaskOn
 
 class CalendarRepository(
     private val database: CalendarDatabase,
     private val clock: Clock = Clock.system(ZoneId.of("Asia/Shanghai")),
     private val reminderScheduler: ReminderScheduler? = null,
+    private val onChanged: (() -> Unit)? = null,
 ) {
     private val dao = database.calendarDao()
 
@@ -31,6 +36,24 @@ class CalendarRepository(
 
     fun observeChangesInMonth(calendarId: String, month: YearMonth) =
         dao.observeChangesInMonth(calendarId, month.atDay(1).toString(), month.atEndOfMonth().toString())
+
+    fun observeMonthlyProgress(today: LocalDate) = combine(
+        dao.observeCalendars(),
+        dao.observeAllCheckInsInMonth(today.withDayOfMonth(1).toString(), today.toString()),
+        dao.observeAllChangesInMonth(today.withDayOfMonth(1).toString(), today.toString()),
+    ) { calendars, checkIns, changes ->
+        val datesByCalendar = checkIns.groupBy { it.calendarId }
+        val changesByCalendar = changes.groupBy { it.calendarId }
+        calendars.associate { calendar ->
+            val dates = datesByCalendar[calendar.id].orEmpty().map { LocalDate.parse(it.localDate) }.toSet()
+            val rules = changesByCalendar[calendar.id].orEmpty().map {
+                ScheduleChange(LocalDate.parse(it.effectiveDate), it.weekdayMask)
+            }
+            calendar.id to monthlyProgress(YearMonth.from(today), today, dates) { date ->
+                isScheduled(date, calendar.startLocalDate(), scheduleMaskOn(date, rules))
+            }
+        }
+    }
 
     suspend fun createCalendar(
         name: String,
@@ -55,6 +78,7 @@ class CalendarRepository(
         database.withTransaction {
             dao.insertCalendar(calendar)
             dao.upsertScheduleChange(ScheduleChangeEntity(calendar.id, today.toString(), weekdayMask))
+            database.localStateDao().recordChange()
         }
         refreshReminder(calendar.id)
     }
@@ -82,6 +106,7 @@ class CalendarRepository(
                 calendar.iconKey != iconKey || calendar.colorKey != colorKey
             ) {
                 check(dao.updateDetails(calendarId, trimmedName, weekdayMask, reminderMinute, reminderEnabled, iconKey, colorKey) == 1)
+                database.localStateDao().recordChange()
                 if (!calendar.isPaused && calendar.weekdayMask != weekdayMask) {
                     val effectiveDate = if (dao.hasCheckIn(calendarId, today.toString())) today.plusDays(1) else today
                     dao.upsertScheduleChange(ScheduleChangeEntity(calendarId, effectiveDate.toString(), weekdayMask))
@@ -97,6 +122,7 @@ class CalendarRepository(
             val calendar = dao.getCalendar(calendarId) ?: throw IllegalArgumentException("日历不存在")
             if (calendar.isPaused != isPaused) {
                 check(dao.updatePaused(calendarId, isPaused) == 1)
+                database.localStateDao().recordChange()
                 val effectiveDate = if (dao.hasCheckIn(calendarId, today.toString())) today.plusDays(1) else today
                 dao.upsertScheduleChange(
                     ScheduleChangeEntity(calendarId, effectiveDate.toString(), if (isPaused) 0 else calendar.weekdayMask),
@@ -112,7 +138,9 @@ class CalendarRepository(
             val calendar = dao.getCalendar(calendarId) ?: throw IllegalArgumentException("日历不存在")
             val mask = dao.getScheduleMaskOn(calendarId, today.toString()) ?: 0
             require(isScheduled(today, calendar.startLocalDate(), mask)) { "今天没有安排打卡" }
-            dao.insertCheckIn(CheckInEntity(calendarId, today.toString())) != -1L
+            (dao.insertCheckIn(CheckInEntity(calendarId, today.toString())) != -1L).also {
+                if (it) database.localStateDao().recordChange()
+            }
         }
         if (inserted) {
             reminderScheduler?.dismissNotification(calendarId)
@@ -126,6 +154,7 @@ class CalendarRepository(
             require(today == LocalDate.now(clock)) { "只能撤销今天的打卡" }
             val removed = dao.deleteCheckIn(calendarId, today.toString()) == 1
             if (removed) {
+                database.localStateDao().recordChange()
                 val tomorrow = today.plusDays(1).toString()
                 val deferredMask = dao.getScheduleChangeOn(calendarId, tomorrow)
                 if (deferredMask != null) {
@@ -141,7 +170,9 @@ class CalendarRepository(
     }
 
     suspend fun deleteCalendar(calendarId: String): Boolean {
-        val deleted = database.withTransaction { dao.deleteCalendar(calendarId) == 1 }
+        val deleted = database.withTransaction {
+            (dao.deleteCalendar(calendarId) == 1).also { if (it) database.localStateDao().recordChange() }
+        }
         if (deleted) {
             reminderScheduler?.dismissNotification(calendarId)
             refreshReminder(calendarId)
@@ -150,6 +181,7 @@ class CalendarRepository(
     }
 
     private suspend fun refreshReminder(calendarId: String) {
+        onChanged?.invoke()
         try {
             reminderScheduler?.refresh(calendarId)
         } catch (error: CancellationException) {
@@ -162,7 +194,8 @@ class CalendarRepository(
     companion object {
         fun open(context: Context): CalendarRepository {
             val database = CalendarDatabase.open(context)
-            return CalendarRepository(database, reminderScheduler = ReminderScheduler(context, database))
+            return CalendarRepository(database, reminderScheduler = ReminderScheduler(context, database),
+                onChanged = { com.hang2515.personalcalendar.backup.BackupWork.schedule(context) })
         }
     }
 }

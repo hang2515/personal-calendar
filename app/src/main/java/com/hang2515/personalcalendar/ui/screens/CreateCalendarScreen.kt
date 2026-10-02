@@ -177,6 +177,25 @@ fun CreateCalendarScreen(
                 }
             }
         }
+        Text("预览效果", style = MaterialTheme.typography.titleMedium)
+        val previewName = name.trim().ifEmpty { "我的坚持日历" }
+        val previewSchedule = if (mask == 0) "请选择重复日期" else scheduleDescription(mask)
+        val previewReminder = if (reminderEnabled) "%02d:%02d 提醒".format(reminderMinute / 60, reminderMinute % 60) else "提醒关闭"
+        Card(
+            modifier = Modifier.fillMaxWidth().semantics {
+                contentDescription = "日历预览：$previewName，$previewSchedule，$previewReminder"
+            },
+            colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = calendarPalette(colorKey).pale),
+        ) {
+            Row(Modifier.padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                CalendarGlyph(iconKey, colorKey, size = 56.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(previewName, style = MaterialTheme.typography.titleLarge)
+                    Text(previewSchedule)
+                    Text(previewReminder)
+                }
+            }
+        }
         Text(if (calendar == null) "开始日期：${today}" else "今天已打卡时，新规则从明天开始。")
         Button(
             onClick = {

@@ -132,7 +132,7 @@ fun CalendarDetailScreen(
                         CalendarMonthGrid(month, today, calendar, ruleChanges, completedDates)
                     }
                 }
-                Text("✓ 已完成   · 待完成   × 未完成", style = MaterialTheme.typography.bodySmall)
+                CalendarStatusLegend()
                 if (YearMonth.from(today) == month && isScheduled(today, calendar.startLocalDate(), scheduleMaskOn(today, ruleChanges))) {
                     if (today in completedDates) {
                         InfoCard("今天已完成", "这一天的坚持已经记录。")
@@ -207,6 +207,11 @@ fun CalendarDetailScreen(
             dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }, enabled = !isDeleting) { Text("取消") } },
         )
     }
+}
+
+@Composable
+internal fun CalendarStatusLegend() {
+    Text("✓ 已完成　× 未完成　浅色：今天待完成\n描边：未来待完成　空白：未安排", style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable

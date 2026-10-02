@@ -7,9 +7,10 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [CalendarEntity::class, CheckInEntity::class, ScheduleChangeEntity::class], version = 4, exportSchema = true)
+@Database(entities = [CalendarEntity::class, CheckInEntity::class, ScheduleChangeEntity::class, LocalState::class], version = 5, exportSchema = true)
 abstract class CalendarDatabase : RoomDatabase() {
     abstract fun calendarDao(): CalendarDao
+    abstract fun localStateDao(): LocalStateDao
 
     companion object {
         @Volatile private var instance: CalendarDatabase? = null
@@ -19,7 +20,7 @@ abstract class CalendarDatabase : RoomDatabase() {
                 context.applicationContext,
                 CalendarDatabase::class.java,
                 "personal-calendar-local.db",
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
         }
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -49,6 +50,13 @@ abstract class CalendarDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE calendars ADD COLUMN iconKey TEXT NOT NULL DEFAULT 'leaf'")
                 db.execSQL("ALTER TABLE calendars ADD COLUMN colorKey TEXT NOT NULL DEFAULT 'sage'")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS local_state (id INTEGER NOT NULL, datasetId TEXT NOT NULL, localRevision INTEGER NOT NULL, boundAccountSub TEXT, backupEnabled INTEGER NOT NULL, lastBackedUpRevision INTEGER, lastBackupAt TEXT, cloudETag TEXT, PRIMARY KEY(id))")
+                db.execSQL("INSERT INTO local_state(id, datasetId, localRevision, backupEnabled) VALUES (1, ?, 0, 0)", arrayOf(java.util.UUID.randomUUID().toString()))
             }
         }
     }
