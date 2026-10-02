@@ -78,8 +78,11 @@ class CloudAuth(context: Context) {
 
     fun loginIntent(): Intent {
         check(CloudConfig.isConfigured) { "此安装包尚未配置云服务" }
-        return service.getAuthorizationRequestIntent(loginRequest(BuildConfig.CLOUD_AUTH_DOMAIN, BuildConfig.CLOUD_CLIENT_ID))
+        return loginIntent(BuildConfig.CLOUD_AUTH_DOMAIN, BuildConfig.CLOUD_CLIENT_ID)
     }
+
+    internal fun loginIntent(authDomain: String, clientId: String): Intent =
+        service.getAuthorizationRequestIntent(loginRequest(authDomain, clientId))
 
     internal fun loginRequest(authDomain: String, clientId: String): AuthorizationRequest {
         val domain = authDomain.trimEnd('/')

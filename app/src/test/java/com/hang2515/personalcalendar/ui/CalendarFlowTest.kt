@@ -40,6 +40,25 @@ class CalendarFlowTest {
     @get:Rule(order = 1) val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
+    fun systemBackFromCreateReturnsToCalendarList() {
+        composeRule.onNodeWithText("日历").performClick()
+        composeRule.onNodeWithContentDescription("新建日历").performClick()
+        composeRule.onNodeWithText("新的坚持").assertExists()
+        composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.onNodeWithText("我的日历").assertIsDisplayed()
+    }
+
+    @Test
+    fun notificationSettingsRemainReachableWhenPermissionIsDenied() {
+        org.robolectric.Shadows.shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        composeRule.onNodeWithText("我的").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithText("打开通知设置").performScrollTo().assertIsDisplayed().performClick()
+        org.junit.Assert.assertEquals(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS,
+            org.robolectric.Shadows.shadowOf(composeRule.activity).nextStartedActivity.action)
+    }
+
+    @Test
     fun reminderTimeUsesScrollableHourAndMinuteSelectors() {
         composeRule.onNodeWithText("日历").performClick()
         composeRule.onNodeWithContentDescription("新建日历").performClick()

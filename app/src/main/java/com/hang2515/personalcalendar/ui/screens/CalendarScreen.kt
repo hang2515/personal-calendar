@@ -1,5 +1,6 @@
 package com.hang2515.personalcalendar.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,6 +45,7 @@ import com.hang2515.personalcalendar.ui.components.CalendarGlyph
 import com.hang2515.personalcalendar.ui.components.ProgressSummary
 import com.hang2515.personalcalendar.ui.components.calendarPalette
 import com.hang2515.personalcalendar.ui.components.PageHeading
+import com.hang2515.personalcalendar.ui.components.MonthNavigation
 import com.hang2515.personalcalendar.ui.databaseState
 import com.hang2515.personalcalendar.domain.ScheduleChange
 import com.hang2515.personalcalendar.domain.isScheduled
@@ -59,6 +61,7 @@ fun CalendarScreen(
     openCalendarId: String?,
     openRequest: Int,
     permissionRevision: Int,
+    onOpenRequestConsumed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val calendarsFlow = remember(repository) { repository.observeCalendars() }
@@ -71,6 +74,14 @@ fun CalendarScreen(
             selectedId = openCalendarId
             isCreating = false
             isEditing = false
+            onOpenRequestConsumed()
+        }
+    }
+    BackHandler(enabled = isCreating || selectedId != null) {
+        when {
+            isCreating -> isCreating = false
+            isEditing -> isEditing = false
+            else -> selectedId = null
         }
     }
 
@@ -211,11 +222,7 @@ private fun CalendarListPreview(
     val changes by databaseState(changesFlow)
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { monthText = month.minusMonths(1).toString() }) { Text("‹") }
-                Text("${month.year}年${month.monthValue}月", style = MaterialTheme.typography.titleMedium)
-                TextButton(onClick = { monthText = month.plusMonths(1).toString() }) { Text("›") }
-            }
+            MonthNavigation(month, onPrevious = { monthText = month.minusMonths(1).toString() }, onNext = { monthText = month.plusMonths(1).toString() })
             when {
                 checkIns is DatabaseState.Loading || changes is DatabaseState.Loading -> Text("正在读取月历…")
                 checkIns is DatabaseState.Failed || changes is DatabaseState.Failed -> Text("月历暂时无法读取")

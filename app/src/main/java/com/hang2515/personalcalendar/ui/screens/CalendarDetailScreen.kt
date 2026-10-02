@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -27,6 +28,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -54,6 +58,7 @@ import com.hang2515.personalcalendar.ui.components.ProgressSummary
 import com.hang2515.personalcalendar.ui.components.calendarPalette
 import com.hang2515.personalcalendar.ui.components.BackButton
 import com.hang2515.personalcalendar.ui.components.CompletedCheckIn
+import com.hang2515.personalcalendar.ui.components.MonthNavigation
 import com.hang2515.personalcalendar.ui.databaseState
 import java.time.LocalDate
 import java.time.YearMonth
@@ -124,11 +129,7 @@ fun CalendarDetailScreen(
                 }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { monthText = month.minusMonths(1).toString() }) { Text("‹ 上月") }
-            Text("${month.year}年${month.monthValue}月", style = MaterialTheme.typography.titleLarge)
-            TextButton(onClick = { monthText = month.plusMonths(1).toString() }) { Text("下月 ›") }
-        }
+        MonthNavigation(month, onPrevious = { monthText = month.minusMonths(1).toString() }, onNext = { monthText = month.plusMonths(1).toString() })
         when {
             checkIns is DatabaseState.Loading || changes is DatabaseState.Loading -> InfoCard("正在读取记录", "稍等片刻。")
             checkIns is DatabaseState.Failed || changes is DatabaseState.Failed -> InfoCard("记录暂时无法读取", "请重新打开应用后再试。")
@@ -237,6 +238,9 @@ internal fun CalendarMonthGrid(
 ) {
     val weekdays = listOf("日", "一", "二", "三", "四", "五", "六")
     val palette = calendarPalette(calendar.colorKey)
+    val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    val cellHeight = 52.dp * fontScale
+    val markerHeight = 42.dp * fontScale
     Row(modifier = Modifier.fillMaxWidth()) {
         weekdays.forEach { label ->
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -251,7 +255,7 @@ internal fun CalendarMonthGrid(
             for (weekday in 0..6) {
                 val day = week * 7 + weekday - leading + 1
                 if (day !in 1..month.lengthOfMonth()) {
-                    Box(modifier = Modifier.weight(1f).height(52.dp))
+                    Box(modifier = Modifier.weight(1f).height(cellHeight))
                 } else {
                     val date = month.atDay(day)
                     val status = dayStatus(date, today, calendar.startLocalDate(), scheduleMaskOn(date, changes), date in completedDates)
@@ -268,9 +272,9 @@ internal fun CalendarMonthGrid(
                         DayStatus.UPCOMING -> "未来待完成"
                         DayStatus.UNSCHEDULED -> "未安排"
                     }
-                    Box(modifier = Modifier.weight(1f).height(52.dp).semantics { contentDescription = "${date}，$statusText" }, contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.weight(1f).height(cellHeight).semantics { contentDescription = "${date}，$statusText" }, contentAlignment = Alignment.Center) {
                         Surface(
-                            modifier = Modifier.size(42.dp),
+                            modifier = Modifier.widthIn(max = 42.dp).fillMaxWidth().height(markerHeight),
                             color = background,
                             shape = CircleShape,
                             border = if (status == DayStatus.UPCOMING) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
@@ -282,8 +286,12 @@ internal fun CalendarMonthGrid(
                                     color = if (status == DayStatus.COMPLETED) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                                 )
                                 if (status == DayStatus.COMPLETED || status == DayStatus.MISSED) {
-                                    Text(if (status == DayStatus.COMPLETED) "✓" else "×", style = MaterialTheme.typography.labelSmall,
-                                        color = if (status == DayStatus.COMPLETED) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.error)
+                                    Icon(
+                                        imageVector = if (status == DayStatus.COMPLETED) Icons.Outlined.Check else Icons.Outlined.Close,
+                                        contentDescription = if (status == DayStatus.COMPLETED) "完成标记" else "未完成标记",
+                                        modifier = Modifier.size(14.dp * fontScale),
+                                        tint = if (status == DayStatus.COMPLETED) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.error,
+                                    )
                                 }
                             }
                         }

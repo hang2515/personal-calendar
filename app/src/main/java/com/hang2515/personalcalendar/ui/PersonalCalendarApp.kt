@@ -38,7 +38,7 @@ private enum class MainTab(val title: String, val icon: ImageVector) {
 }
 
 @Composable
-fun PersonalCalendarApp(openCalendarId: String?, openRequest: Int, permissionRevision: Int) {
+fun PersonalCalendarApp(openCalendarId: String?, openRequest: Int, permissionRevision: Int, onOpenRequestConsumed: () -> Unit) {
     var selectedTab by rememberSaveable { mutableStateOf(if (openCalendarId == null) MainTab.TODAY else MainTab.CALENDARS) }
     val context = LocalContext.current
     val repository = remember { CalendarRepository.open(context) }
@@ -70,7 +70,7 @@ fun PersonalCalendarApp(openCalendarId: String?, openRequest: Int, permissionRev
         val modifier = Modifier.padding(contentPadding)
         when (selectedTab) {
             MainTab.TODAY -> TodayScreen(repository, today, modifier)
-            MainTab.CALENDARS -> CalendarScreen(repository, today, openCalendarId, openRequest, permissionRevision, modifier)
+            MainTab.CALENDARS -> CalendarScreen(repository, today, openCalendarId, openRequest, permissionRevision, onOpenRequestConsumed, modifier)
             MainTab.PROFILE -> ProfileScreen(permissionRevision, modifier)
         }
     }

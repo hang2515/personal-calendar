@@ -36,6 +36,7 @@ private val colorScheme = lightColorScheme(
     outlineVariant = Color(0xFFDFE5DB),
     surfaceContainer = Color.White,
     surfaceContainerLow = Color.White,
+    surfaceContainerHigh = WarmBackground,
     surfaceContainerHighest = Color.White,
 )
 

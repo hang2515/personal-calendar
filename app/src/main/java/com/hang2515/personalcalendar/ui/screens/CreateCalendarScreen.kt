@@ -96,23 +96,20 @@ fun CreateCalendarScreen(
         }
         FormCard {
             Text("重复日期", style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = isDaily, onClick = { isDaily = true }, label = { Text("每天") })
                 FilterChip(selected = !isDaily, onClick = { isDaily = false }, label = { Text("指定星期") })
             }
             if (!isDaily) {
                 val weekdayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
-                for (rowIndex in 0..1) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val indices = if (rowIndex == 0) 0..3 else 4..6
-                        indices.forEach { index ->
-                            val bit = 1 shl index
-                            FilterChip(
-                                selected = selectedWeekdays and bit != 0,
-                                onClick = { selectedWeekdays = selectedWeekdays xor bit },
-                                label = { Text(weekdayLabels[index]) },
-                            )
-                        }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    weekdayLabels.indices.forEach { index ->
+                        val bit = 1 shl index
+                        FilterChip(
+                            selected = selectedWeekdays and bit != 0,
+                            onClick = { selectedWeekdays = selectedWeekdays xor bit },
+                            label = { Text(weekdayLabels[index]) },
+                        )
                     }
                 }
                 if (selectedWeekdays == 0) Text("请至少选择一个星期", color = MaterialTheme.colorScheme.error)
@@ -120,13 +117,13 @@ fun CreateCalendarScreen(
         }
         FormCard {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("计划日提醒", style = MaterialTheme.typography.titleMedium)
+                Text("计划日提醒", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it }, modifier = Modifier.semantics { contentDescription = "计划日提醒" })
             }
             if (reminderEnabled) {
                 Surface(onClick = { showTimePicker = true }, color = MaterialTheme.colorScheme.primaryContainer,
                     shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    FlowRow(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("提醒时间：%02d:%02d".format(reminderMinute / 60, reminderMinute % 60), style = MaterialTheme.typography.titleMedium)
                         Text("调整 ›", style = MaterialTheme.typography.labelLarge)
                     }

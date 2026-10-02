@@ -26,7 +26,11 @@ class MainActivity : ComponentActivity() {
         openCalendarId = intent.getStringExtra(ReminderScheduler.EXTRA_CALENDAR_ID)
         setContent {
             PersonalCalendarTheme {
-                PersonalCalendarApp(openCalendarId, openRequest, permissionRevision)
+                PersonalCalendarApp(openCalendarId, openRequest, permissionRevision, onOpenRequestConsumed = {
+                    openCalendarId = null
+                    // 通知导航是一次性事件，旋转或切换底栏不能再次消费旧 Intent。
+                    intent.removeExtra(ReminderScheduler.EXTRA_CALENDAR_ID)
+                })
             }
         }
     }
