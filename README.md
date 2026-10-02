@@ -45,4 +45,6 @@ Android 13 及以上需允许通知；Android 12 及以上若未允许“闹钟�
 
 ## 开发流程
 
+后续 Agent 开发先阅读根目录 [AGENTS.md](AGENTS.md)，遵守产品规则、数据与备份契约、验证及交付要求。
+
 按[开发计划](docs/开发计划.md)推进。本地验证运行 Gradle 单元测试、构建与 Lint；云端在 `cloud` 运行 `npm.cmd run check`、`npm.cmd test`、`npx.cmd cdk synth --strict`，部署前查看 `cdk diff`。测试环境可执行 `cloud/scripts/smoke.ps1` 验证真实云资源。实际浏览器登录回跳、换机恢复、后台网络限制和通知需要真机验收。不得把本机配置、密钥、令牌、用户备份或签名文件提交到仓库。
