@@ -1,16 +1,18 @@
 package com.hang2515.personalcalendar.ui.screens
 
-import android.app.TimePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -19,7 +21,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,7 +34,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -43,6 +43,9 @@ import com.hang2515.personalcalendar.data.CalendarEntity
 import com.hang2515.personalcalendar.ui.components.ReminderPermissionCard
 import com.hang2515.personalcalendar.ui.components.CalendarGlyph
 import com.hang2515.personalcalendar.ui.components.calendarPalette
+import com.hang2515.personalcalendar.ui.components.WheelTimePicker
+import com.hang2515.personalcalendar.ui.components.BackButton
+import com.hang2515.personalcalendar.ui.components.PageHeading
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -67,7 +70,7 @@ fun CreateCalendarScreen(
     var reminderEnabled by rememberSaveable(calendar?.id) { mutableStateOf(calendar?.reminderEnabled ?: false) }
     var iconKey by rememberSaveable(calendar?.id) { mutableStateOf(calendar?.iconKey ?: "leaf") }
     var colorKey by rememberSaveable(calendar?.id) { mutableStateOf(calendar?.colorKey ?: "sage") }
-    val context = LocalContext.current
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val mask = if (isDaily) 127 else selectedWeekdays
     val isNameValid = name.trim().isNotEmpty() && name.trim().length <= 40
@@ -76,16 +79,16 @@ fun CreateCalendarScreen(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        TextButton(onClick = onBack) { Text(if (calendar == null) "← 返回日历" else "← 返回详情") }
-        Text(if (calendar == null) "新建坚持日历" else "编辑坚持日历", style = MaterialTheme.typography.headlineMedium)
-        Text(if (calendar == null) "给想坚持的事一个名字，从今天开始记录。" else "修改名称和今后的重复日期，过去的记录会保留。")
+        BackButton(onBack, if (calendar == null) "返回日历" else "返回详情")
+        PageHeading(if (calendar == null) "新的坚持" else "编辑日历",
+            if (calendar == null) "从一件小事开始，把每一天记下来。" else "调整今后的计划，保留过去的坚持。")
         FormCard {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it; saveError = false },
                 label = { Text("日历名称") },
                 placeholder = { Text("例如：吃药、阅读或运动") },
-                supportingText = { Text("1 至 40 个字符，可以和已有日历同名") },
+                supportingText = { Text("${name.trim().length} / 40") },
                 isError = name.trim().length > 40,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -118,18 +121,16 @@ fun CreateCalendarScreen(
         FormCard {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("计划日提醒", style = MaterialTheme.typography.titleMedium)
-                Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
+                Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it }, modifier = Modifier.semantics { contentDescription = "计划日提醒" })
             }
             if (reminderEnabled) {
-                OutlinedButton(onClick = {
-                    TimePickerDialog(
-                        context,
-                        { _, hour, minute -> reminderMinute = hour * 60 + minute },
-                        reminderMinute / 60,
-                        reminderMinute % 60,
-                        true,
-                    ).show()
-                }) { Text("提醒时间：%02d:%02d".format(reminderMinute / 60, reminderMinute % 60)) }
+                Surface(onClick = { showTimePicker = true }, color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("提醒时间：%02d:%02d".format(reminderMinute / 60, reminderMinute % 60), style = MaterialTheme.typography.titleMedium)
+                        Text("调整 ›", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
                 ReminderPermissionCard(permissionRevision)
             }
         }
@@ -153,26 +154,29 @@ fun CreateCalendarScreen(
                 }
             }
             val colors = listOf("sage", "mint", "blue", "lavender", "coral", "sand")
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                colors.forEach { key ->
-                    Surface(
-                        onClick = { colorKey = key },
-                        shape = CircleShape,
-                        border = if (colorKey == key) BorderStroke(2.dp, MaterialTheme.colorScheme.onBackground) else null,
-                        modifier = Modifier.size(40.dp).semantics {
-                            contentDescription = when (key) {
-                                "sage" -> "鼠尾草绿"
-                                "mint" -> "薄荷绿"
-                                "blue" -> "浅蓝色"
-                                "lavender" -> "薰衣草紫"
-                                "coral" -> "珊瑚粉"
-                                else -> "暖沙色"
-                            }
-                            selected = colorKey == key
-                        },
-                    ) {
-                        Box(modifier = Modifier.background(calendarPalette(key).pale).padding(6.dp)
-                            .background(calendarPalette(key).accent, CircleShape))
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                FlowRow(modifier = Modifier.fillMaxWidth(), maxItemsInEachRow = if (maxWidth >= 308.dp) 6 else 3,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    colors.forEach { key ->
+                        Surface(
+                            onClick = { colorKey = key },
+                            shape = CircleShape,
+                            border = if (colorKey == key) BorderStroke(2.dp, MaterialTheme.colorScheme.onBackground) else null,
+                            modifier = Modifier.size(48.dp).semantics {
+                                contentDescription = when (key) {
+                                    "sage" -> "鼠尾草绿"
+                                    "mint" -> "薄荷绿"
+                                    "blue" -> "浅蓝色"
+                                    "lavender" -> "薰衣草紫"
+                                    "coral" -> "珊瑚粉"
+                                    else -> "暖沙色"
+                                }
+                                selected = colorKey == key
+                            },
+                        ) {
+                            Box(modifier = Modifier.background(calendarPalette(key).pale).padding(6.dp)
+                                .background(calendarPalette(key).accent, CircleShape))
+                        }
                     }
                 }
             }
@@ -214,10 +218,13 @@ fun CreateCalendarScreen(
                 }
             },
             enabled = isNameValid && mask != 0 && !isSaving,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
         ) { Text(if (isSaving) "正在保存…" else if (calendar == null) "创建日历" else "保存修改") }
         if (saveError) Text("日历未保存，请重试。", color = MaterialTheme.colorScheme.error)
     }
+    if (showTimePicker) WheelTimePicker(reminderMinute, onDismiss = { showTimePicker = false }, onConfirm = {
+        reminderMinute = it; showTimePicker = false
+    })
 }
 
 @Composable

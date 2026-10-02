@@ -78,14 +78,18 @@ class CloudAuth(context: Context) {
 
     fun loginIntent(): Intent {
         check(CloudConfig.isConfigured) { "此安装包尚未配置云服务" }
-        val domain = BuildConfig.CLOUD_AUTH_DOMAIN.trimEnd('/')
+        return service.getAuthorizationRequestIntent(loginRequest(BuildConfig.CLOUD_AUTH_DOMAIN, BuildConfig.CLOUD_CLIENT_ID))
+    }
+
+    internal fun loginRequest(authDomain: String, clientId: String): AuthorizationRequest {
+        val domain = authDomain.trimEnd('/')
         val configuration = AuthorizationServiceConfiguration(Uri.parse("$domain/oauth2/authorize"), Uri.parse("$domain/oauth2/token"))
-        val request = AuthorizationRequest.Builder(configuration, BuildConfig.CLOUD_CLIENT_ID, ResponseTypeValues.CODE,
+        return AuthorizationRequest.Builder(configuration, clientId, ResponseTypeValues.CODE,
             Uri.parse("com.hang2515.personalcalendar://oauth/callback"))
             .setScopes("openid", "email", "personal-calendar/backup")
-            .setAdditionalParameters(mapOf("prompt" to "login"))
+            // prompt 是 AppAuth 内置参数，放入 additionalParameters 会在打开浏览器前抛出异常。
+            .setPrompt(AuthorizationRequest.Prompt.LOGIN)
             .build()
-        return service.getAuthorizationRequestIntent(request)
     }
 
     suspend fun finishLogin(intent: Intent) {

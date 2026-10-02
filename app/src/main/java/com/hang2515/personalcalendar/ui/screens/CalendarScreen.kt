@@ -19,6 +19,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +43,7 @@ import com.hang2515.personalcalendar.ui.components.InfoCard
 import com.hang2515.personalcalendar.ui.components.CalendarGlyph
 import com.hang2515.personalcalendar.ui.components.ProgressSummary
 import com.hang2515.personalcalendar.ui.components.calendarPalette
+import com.hang2515.personalcalendar.ui.components.PageHeading
 import com.hang2515.personalcalendar.ui.databaseState
 import com.hang2515.personalcalendar.domain.ScheduleChange
 import com.hang2515.personalcalendar.domain.isScheduled
@@ -140,12 +147,10 @@ private fun CalendarListScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("我的日历", style = MaterialTheme.typography.headlineMedium)
-                Text("每个目标，都有属于自己的坚持记录。")
+            PageHeading("我的日历", "把坚持，慢慢变成日常") {
+                FilledTonalIconButton(onClick = onCreate) { Icon(Icons.Outlined.Add, contentDescription = "新建日历") }
             }
         }
-        item { Button(onClick = onCreate) { Text("＋ 新建日历") } }
         when (calendars) {
             DatabaseState.Loading -> item { InfoCard("正在读取日历", "稍等片刻。") }
             DatabaseState.Failed -> item { InfoCard("日历暂时无法读取", "请重新打开应用后再试。") }
@@ -170,7 +175,7 @@ private fun CalendarListScreen(
                                         horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         CalendarGlyph(calendar.iconKey, calendar.colorKey, size = 52.dp)
-                                        Text(calendar.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                                        Text(calendar.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(if (calendar.isPaused) "已暂停" else scheduleDescription(calendar.weekdayMask),
                                             style = MaterialTheme.typography.bodySmall, maxLines = 1)
                                         val progress = (progressByCalendar as? DatabaseState.Ready)?.value?.get(calendar.id)
@@ -206,7 +211,7 @@ private fun CalendarListPreview(
     val changes by databaseState(changesFlow)
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { monthText = month.minusMonths(1).toString() }) { Text("‹") }
                 Text("${month.year}年${month.monthValue}月", style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = { monthText = month.plusMonths(1).toString() }) { Text("›") }
@@ -229,7 +234,7 @@ private fun CalendarListPreview(
                     CalendarStatusLegend()
                 }
             }
-            Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("查看完整日历") }
+            TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("查看完整日历") }
         }
     }
 }

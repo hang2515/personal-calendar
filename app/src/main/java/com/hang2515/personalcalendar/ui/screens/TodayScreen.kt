@@ -37,6 +37,8 @@ import com.hang2515.personalcalendar.ui.components.InfoCard
 import com.hang2515.personalcalendar.ui.components.CalendarGlyph
 import com.hang2515.personalcalendar.ui.components.ProgressSummary
 import com.hang2515.personalcalendar.ui.components.calendarPalette
+import com.hang2515.personalcalendar.ui.components.CompletedCheckIn
+import com.hang2515.personalcalendar.ui.components.PageHeading
 import com.hang2515.personalcalendar.ui.databaseState
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -63,12 +65,8 @@ fun TodayScreen(repository: CalendarRepository, today: LocalDate, modifier: Modi
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(today.format(dateFormatter), style = MaterialTheme.typography.headlineMedium)
-                    Text("坚持小小的习惯，遇见更好的自己", style = MaterialTheme.typography.bodyMedium)
-                }
-                CalendarGlyph("leaf", "sand", size = 56.dp)
+            PageHeading("今天，继续坚持", today.format(dateFormatter)) {
+                CalendarGlyph("leaf", "sand", size = 48.dp)
             }
         }
         when {
@@ -101,7 +99,7 @@ fun TodayScreen(repository: CalendarRepository, today: LocalDate, modifier: Modi
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = if (calendar.id in completedIds) palette.pale else MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         ) {
                             Column(
                                 modifier = Modifier.padding(20.dp),
@@ -120,14 +118,10 @@ fun TodayScreen(repository: CalendarRepository, today: LocalDate, modifier: Modi
                                             Text(scheduleDescription(calendar.weekdayMask), style = MaterialTheme.typography.bodySmall)
                                         }
                                     }
-                                    if (calendar.id in completedIds) {
-                                        Icon(Icons.Outlined.CheckCircle, contentDescription = "今天已完成", tint = palette.accent)
-                                    }
                                 }
                                 if (calendar.id in completedIds) {
-                                    Text("今天已完成", color = palette.accent, style = MaterialTheme.typography.labelLarge)
-                                    TextButton(
-                                        onClick = {
+                                    CompletedCheckIn(
+                                        onUndo = {
                                             savingId = calendar.id
                                             saveError = false
                                             scope.launch {
@@ -141,7 +135,7 @@ fun TodayScreen(repository: CalendarRepository, today: LocalDate, modifier: Modi
                                             }
                                         },
                                         enabled = savingId == null,
-                                    ) { Text("撤销打卡") }
+                                    )
                                 } else {
                                     Button(
                                         onClick = {

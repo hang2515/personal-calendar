@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.isToggleable
 import com.hang2515.personalcalendar.MainActivity
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
@@ -39,9 +40,19 @@ class CalendarFlowTest {
     @get:Rule(order = 1) val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
+    fun reminderTimeUsesScrollableHourAndMinuteSelectors() {
+        composeRule.onNodeWithText("日历").performClick()
+        composeRule.onNodeWithContentDescription("新建日历").performClick()
+        composeRule.onNode(isToggleable()).performScrollTo().performClick()
+        composeRule.onNodeWithText("提醒时间：08:00").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("小时").assertExists()
+        composeRule.onNodeWithContentDescription("分钟").assertExists()
+    }
+
+    @Test
     fun newCalendarShowsLivePreviewAndMonthlyCardCountUpdatesAfterCheckIn() {
         composeRule.onNodeWithText("日历").performClick()
-        composeRule.onNodeWithText("＋ 新建日历").performClick()
+        composeRule.onNodeWithContentDescription("新建日历").performClick()
         composeRule.onNode(hasSetTextAction()).performTextInput("散步")
         composeRule.onNodeWithText("预览效果").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithContentDescription("日历预览：散步，每天，提醒关闭").assertExists()
@@ -66,6 +77,10 @@ class CalendarFlowTest {
     @Test
     fun profileHelpAndPrivacyCanBeOpenedWithoutSigningIn() {
         composeRule.onNodeWithText("我的").performClick()
+        composeRule.onNodeWithText("通知尚未开启，提醒不会显示。").assertDoesNotExist()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithText("通知与提醒设置").assertIsDisplayed()
+        composeRule.onNodeWithText("知道了").performClick()
         composeRule.onNodeWithText("帮助与反馈").performScrollTo().performClick()
         composeRule.onNodeWithText("如何记录与恢复").assertIsDisplayed()
         composeRule.onNodeWithText("分享反馈信息").assertExists()
@@ -80,7 +95,7 @@ class CalendarFlowTest {
     @Test
     fun calendarCanBeCreatedCheckedInUndoneAndDeleted() {
         composeRule.onNodeWithText("日历").performClick()
-        composeRule.onNodeWithText("＋ 新建日历").performClick()
+        composeRule.onNodeWithContentDescription("新建日历").performClick()
         composeRule.onNode(hasSetTextAction()).performTextInput("阅读")
         composeRule.onNodeWithText("创建日历").performScrollTo().performClick()
         composeRule.waitUntil(10_000) {
@@ -94,7 +109,7 @@ class CalendarFlowTest {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithText("今天已完成").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("撤销打卡").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("撤销打卡").performScrollTo().performClick()
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithText("完成打卡").fetchSemanticsNodes().isNotEmpty()
         }
@@ -106,6 +121,7 @@ class CalendarFlowTest {
         composeRule.onNode(hasScrollToNodeAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
             .performScrollToNode(hasText("查看完整日历"))
         composeRule.onNodeWithText("查看完整日历").performClick()
+        composeRule.onNodeWithContentDescription("日历管理").performClick()
         composeRule.onNodeWithText("删除日历").performClick()
         composeRule.onNodeWithText("确认删除").performClick()
         composeRule.waitUntil(10_000) {

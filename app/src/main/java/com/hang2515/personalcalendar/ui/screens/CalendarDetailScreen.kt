@@ -21,6 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +52,8 @@ import com.hang2515.personalcalendar.ui.components.InfoCard
 import com.hang2515.personalcalendar.ui.components.CalendarGlyph
 import com.hang2515.personalcalendar.ui.components.ProgressSummary
 import com.hang2515.personalcalendar.ui.components.calendarPalette
+import com.hang2515.personalcalendar.ui.components.BackButton
+import com.hang2515.personalcalendar.ui.components.CompletedCheckIn
 import com.hang2515.personalcalendar.ui.databaseState
 import java.time.LocalDate
 import java.time.YearMonth
@@ -73,43 +81,49 @@ fun CalendarDetailScreen(
     var isChangingPause by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
     val palette = calendarPalette(calendar.colorKey)
 
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        TextButton(onClick = onBack) { Text("← 返回日历") }
+        BackButton(onBack)
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             CalendarGlyph(calendar.iconKey, calendar.colorKey, size = 70.dp)
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(calendar.name, style = MaterialTheme.typography.headlineMedium)
                 Text(if (calendar.isPaused) "已暂停 · 后续日期不安排打卡" else scheduleDescription(calendar.weekdayMask))
                 if (calendar.reminderEnabled) {
                     Text("计划日 %02d:%02d 提醒".format(calendar.reminderMinute / 60, calendar.reminderMinute % 60))
                 }
             }
+            Box {
+                IconButton(onClick = { showMenu = true }) { Icon(Icons.Outlined.MoreVert, "日历管理") }
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(text = { Text("编辑日历") }, onClick = { showMenu = false; onEdit() })
+                    DropdownMenuItem(
+                        text = { Text(if (calendar.isPaused) "恢复日历" else "暂停日历") },
+                        onClick = {
+                            showMenu = false
+                            isChangingPause = true
+                            saveError = false
+                            scope.launch {
+                                try {
+                                    repository.setPaused(calendar.id, !calendar.isPaused, today)
+                                } catch (_: Exception) {
+                                    saveError = true
+                                } finally {
+                                    isChangingPause = false
+                                }
+                            }
+                        },
+                        enabled = !isChangingPause,
+                    )
+                    DropdownMenuItem(text = { Text("删除日历", color = MaterialTheme.colorScheme.error) }, onClick = { showMenu = false; showDeleteConfirmation = true })
+                }
+            }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onEdit) { Text("编辑日历") }
-            TextButton(
-                onClick = {
-                    isChangingPause = true
-                    saveError = false
-                    scope.launch {
-                        try {
-                            repository.setPaused(calendar.id, !calendar.isPaused, today)
-                        } catch (_: Exception) {
-                            saveError = true
-                        } finally {
-                            isChangingPause = false
-                        }
-                    }
-                },
-                enabled = !isChangingPause,
-            ) { Text(if (calendar.isPaused) "恢复日历" else "暂停日历") }
-        }
-        TextButton(onClick = { showDeleteConfirmation = true }) { Text("删除日历", color = MaterialTheme.colorScheme.error) }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { monthText = month.minusMonths(1).toString() }) { Text("‹ 上月") }
             Text("${month.year}年${month.monthValue}月", style = MaterialTheme.typography.titleLarge)
@@ -135,9 +149,8 @@ fun CalendarDetailScreen(
                 CalendarStatusLegend()
                 if (YearMonth.from(today) == month && isScheduled(today, calendar.startLocalDate(), scheduleMaskOn(today, ruleChanges))) {
                     if (today in completedDates) {
-                        InfoCard("今天已完成", "这一天的坚持已经记录。")
-                        TextButton(
-                            onClick = {
+                        CompletedCheckIn(
+                            onUndo = {
                                 isSaving = true
                                 saveError = false
                                 scope.launch {
@@ -151,7 +164,7 @@ fun CalendarDetailScreen(
                                 }
                             },
                             enabled = !isSaving,
-                        ) { Text("撤销今日打卡") }
+                        )
                     } else {
                         Button(
                             onClick = {

@@ -1,9 +1,14 @@
 package com.hang2515.personalcalendar.ui.screens
 
+import android.content.ActivityNotFoundException
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -11,11 +16,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.hang2515.personalcalendar.backup.BackupApiException
 import com.hang2515.personalcalendar.backup.BackupCoordinator
@@ -38,6 +49,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CloudBackupCard(onAccountChanged: (Boolean, String?) -> Unit) {
     val context = LocalContext.current
@@ -52,6 +64,7 @@ fun CloudBackupCard(onAccountChanged: (Boolean, String?) -> Unit) {
     var showSecurity by remember { mutableStateOf(false) }
     var accountEmail by remember { mutableStateOf<String?>(null) }
     var accountReadFailed by remember { mutableStateOf(false) }
+    var showManagement by remember { mutableStateOf(false) }
 
     fun refreshAccount() {
         signedIn = coordinator.auth.isSignedIn()
@@ -74,6 +87,15 @@ fun CloudBackupCard(onAccountChanged: (Boolean, String?) -> Unit) {
     }
     val login = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { response ->
         response.data?.let { intent -> runAction { coordinator.finishLogin(intent); "登录成功，请预览云备份后选择操作" } }
+            ?: run { message = "已取消登录，本机记录不受影响" }
+    }
+    fun openLogin() {
+        try { login.launch(coordinator.auth.loginIntent()) }
+        catch (_: ActivityNotFoundException) { message = "没有可用于授权的浏览器，请检查默认浏览器设置" }
+        catch (error: Exception) {
+            Log.e("CloudAuth", "登录启动失败：${error.javaClass.simpleName}")
+            message = if (!CloudConfig.isConfigured) "此安装包尚未配置云服务" else "登录请求未能启动，请重试或更新应用"
+        }
     }
     LaunchedEffect(Unit) {
         while (true) {
@@ -85,44 +107,72 @@ fun CloudBackupCard(onAccountChanged: (Boolean, String?) -> Unit) {
             delay(3000)
         }
     }
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("云备份", style = MaterialTheme.typography.titleLarge)
-            Text("日常使用无需登录。开启备份后，可在换机时恢复日历和打卡。")
-            if (!CloudConfig.isConfigured) {
-                Text("此安装包使用本地模式，尚未连接云服务。")
-            } else {
-                Text(if (signedIn) "云备份账号已登录" else "尚未登录云备份账号")
-                Text(if (state?.backupEnabled == true) "自动备份已开启" else "自动备份已关闭")
-                state?.lastBackupAt?.let { time ->
-                    val display = runCatching { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(time)) }.getOrDefault(time)
-                    Text("最近备份：$display")
+    val lastBackup = state?.lastBackupAt?.let { time ->
+        runCatching { DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(time)) }.getOrDefault("时间暂不可用")
+    }
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val heading: @Composable (Modifier) -> Unit = { modifier ->
+                Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("云备份", style = MaterialTheme.typography.titleMedium)
+                    Text(when {
+                        !CloudConfig.isConfigured -> "本地模式"
+                        accountReadFailed -> "登录状态需要处理"
+                        !signedIn -> "为每一份坚持，留一份备份"
+                        state?.backupEnabled != true -> "已登录 · 自动备份未开启"
+                        state?.localRevision != state?.lastBackedUpRevision -> "自动备份已开启 · 有更新待上传"
+                        lastBackup != null -> "最近备份 $lastBackup"
+                        else -> "自动备份已开启"
+                    }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (state?.backupEnabled == true && state?.localRevision != state?.lastBackedUpRevision) Text("有修改等待备份")
-                if (!signedIn) {
-                    Text("欢迎使用个人日历", style = MaterialTheme.typography.titleMedium)
-                    Button(enabled = !busy, onClick = {
-                        try { login.launch(coordinator.auth.loginIntent()) }
-                        catch (_: Exception) { message = "无法打开登录页面，请确认已安装浏览器" }
-                    }) { Text("登录 / 注册") }
+                }
+                val accountAction: @Composable () -> Unit = {
+                if (CloudConfig.isConfigured) {
+                    if (!signedIn && !accountReadFailed) Button(enabled = !busy, onClick = ::openLogin) { Text("登录 / 注册") }
+                    else TextButton(enabled = !busy, onClick = { showManagement = true }) { Text("管理 ›") }
+                }
+                }
+                if (maxWidth < 280.dp || LocalDensity.current.fontScale > 1.3f) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { heading(Modifier.fillMaxWidth()); accountAction() }
                 } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        heading(Modifier.weight(1f)); accountAction()
+                    }
+                }
+            }
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+    if (showManagement) {
+        ModalBottomSheet(onDismissRequest = { showManagement = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.background) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).navigationBarsPadding().padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("备份管理", style = MaterialTheme.typography.headlineMedium)
+                Text(accountEmail ?: "云备份账号", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (state?.backupEnabled == true) "自动备份已开启" else "自动备份已关闭", style = MaterialTheme.typography.titleMedium)
+                Text(lastBackup?.let { "最近备份：$it" } ?: "还没有成功备份记录", style = MaterialTheme.typography.bodyMedium)
+                Text("备份保存整份日历与打卡。恢复前可预览，确认后替换本机记录。", style = MaterialTheme.typography.bodyMedium)
+                if (signedIn) {
                     OutlinedButton(enabled = !busy, onClick = { runAction {
-                        preview = coordinator.preview(); "已读取云备份，请选择操作"
-                    } }) { Text("查看云备份 / 设置") }
+                        preview = coordinator.preview(); showManagement = false; "已读取云备份，请选择操作"
+                    } }, modifier = Modifier.fillMaxWidth()) { Text("预览与恢复") }
                     if (state?.backupEnabled == true) {
                         Button(enabled = !busy, onClick = { runAction {
                             if (coordinator.upload()) "备份已完成" else "已上传一份备份，仍有新修改待上传"
-                        } }) { Text("立即备份") }
+                        } }, modifier = Modifier.fillMaxWidth()) { Text("立即备份") }
                         TextButton(enabled = !busy, onClick = { runAction { coordinator.stop(false); "自动备份已关闭" } }) { Text("关闭自动备份") }
                     }
                 }
-                TextButton(enabled = !busy, onClick = { showSecurity = true }) { Text("账号与安全") }
+                TextButton(enabled = !busy, onClick = { showManagement = false; showSecurity = true }) { Text("账号与安全") }
                 if (signedIn || accountReadFailed) TextButton(enabled = !busy, onClick = { runAction {
-                    coordinator.stop(true); preview = null; "已退出云备份账号，本机记录保留"
+                    coordinator.stop(true); preview = null; showManagement = false; "已退出云备份账号，本机记录保留"
                 } }) { Text(if (accountReadFailed) "清除本机登录状态" else "退出云备份账号") }
+                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             }
-            if (busy) CircularProgressIndicator()
-            message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
         }
     }
     if (showSecurity) {
@@ -133,15 +183,14 @@ fun CloudBackupCard(onAccountChanged: (Boolean, String?) -> Unit) {
                 Text("退出登录会清除这部手机的登录状态并停止备份，本机记录保留。重新登录后，需要重新确认开启云备份。")
             } },
             confirmButton = { TextButton(onClick = {
-                try { login.launch(coordinator.auth.loginIntent()); showSecurity = false }
-                catch (_: Exception) { message = "无法打开登录页面，请确认已安装浏览器"; showSecurity = false }
+                openLogin(); showSecurity = false
             }) { Text("打开登录页找回密码") } },
             dismissButton = { TextButton(onClick = { showSecurity = false }) { Text("关闭") } })
     }
-    preview?.let { selected ->
+    preview?.takeIf { action == null }?.let { selected ->
         val snapshot = selected.backup?.let { BackupSnapshot.decode(it.body) }
         AlertDialog(onDismissRequest = { if (!busy) preview = null }, title = { Text("云备份设置") },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(if (snapshot == null) "此账号尚无云备份。" else "备份时间：${snapshot.createdAt}\n${snapshot.calendars.size} 个日历，${snapshot.checkIns.size} 条打卡")
                 if (state?.boundAccountSub != null && state?.boundAccountSub != selected.account) Text("本机记录曾绑定其他账号。继续上传会把本机记录保存到当前账号。")
                 Button(enabled = !busy, onClick = { action = "upload" }) { Text(if (snapshot == null) "开启备份" else "用本机数据覆盖云备份") }

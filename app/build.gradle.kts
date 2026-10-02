@@ -14,8 +14,8 @@ android {
         applicationId = "com.hang2515.personalcalendar"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         manifestPlaceholders["appAuthRedirectScheme"] = "com.hang2515.personalcalendar"
         val cloudSettings = Properties().apply {
             val file = rootProject.file("cloud-config.properties")
