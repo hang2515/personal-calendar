@@ -40,6 +40,12 @@ interface CalendarDao {
     @Query("SELECT weekdayMask FROM schedule_changes WHERE calendarId = :calendarId AND effectiveDate <= :date ORDER BY effectiveDate DESC LIMIT 1")
     suspend fun getScheduleMaskOn(calendarId: String, date: String): Int?
 
+    @Query("SELECT weekdayMask FROM schedule_changes WHERE calendarId = :calendarId AND effectiveDate = :date")
+    suspend fun getScheduleChangeOn(calendarId: String, date: String): Int?
+
+    @Query("DELETE FROM schedule_changes WHERE calendarId = :calendarId AND effectiveDate = :date")
+    suspend fun deleteScheduleChangeOn(calendarId: String, date: String): Int
+
     @Query("SELECT calendarId, effectiveDate, weekdayMask FROM schedule_changes WHERE effectiveDate = (SELECT MAX(other.effectiveDate) FROM schedule_changes AS other WHERE other.calendarId = schedule_changes.calendarId AND other.effectiveDate <= :date)")
     fun observeSchedulesOn(date: String): Flow<List<ScheduleChangeEntity>>
 

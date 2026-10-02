@@ -141,6 +141,32 @@ class CalendarDatabaseTest {
     }
 
     @Test
+    fun undoAfterPausingTodayMovesDeferredRuleToToday() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val database = Room.inMemoryDatabaseBuilder(context, CalendarDatabase::class.java).build()
+        val today = LocalDate.of(2026, 10, 1)
+        val clock = Clock.fixed(Instant.parse("2026-10-01T04:00:00Z"), ZoneId.of("Asia/Shanghai"))
+        val repository = CalendarRepository(database, clock)
+        try {
+            repository.createCalendar("阅读", 127, today)
+            val id = database.calendarDao().observeCalendars().first().single().id
+            assertTrue(repository.checkIn(id, today))
+            repository.setPaused(id, true, today)
+            assertEquals(127, database.calendarDao().getScheduleMaskOn(id, today.toString()))
+
+            assertTrue(repository.undoCheckIn(id, today))
+            assertEquals(0, database.calendarDao().getScheduleMaskOn(id, today.toString()))
+            assertEquals(0, database.calendarDao().getScheduleMaskOn(id, today.plusDays(1).toString()))
+            assertEquals(null, database.calendarDao().getScheduleChangeOn(id, today.plusDays(1).toString()))
+            assertFalse(database.calendarDao().hasCheckIn(id, today.toString()))
+            repository.setPaused(id, false, today)
+            assertEquals(127, database.calendarDao().getScheduleMaskOn(id, today.plusDays(1).toString()))
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
     fun deletingCalendarRemovesHistoryAndReminder() = runBlocking {
         val context = RuntimeEnvironment.getApplication()
         Shadows.shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)

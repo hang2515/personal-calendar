@@ -124,7 +124,17 @@ class CalendarRepository(
     suspend fun undoCheckIn(calendarId: String, today: LocalDate): Boolean {
         val deleted = database.withTransaction {
             require(today == LocalDate.now(clock)) { "只能撤销今天的打卡" }
-            dao.deleteCheckIn(calendarId, today.toString()) == 1
+            val removed = dao.deleteCheckIn(calendarId, today.toString()) == 1
+            if (removed) {
+                val tomorrow = today.plusDays(1).toString()
+                val deferredMask = dao.getScheduleChangeOn(calendarId, tomorrow)
+                if (deferredMask != null) {
+                    // 打卡后修改的规则曾顺延到明天；撤销打卡后从今天生效。
+                    dao.upsertScheduleChange(ScheduleChangeEntity(calendarId, today.toString(), deferredMask))
+                    check(dao.deleteScheduleChangeOn(calendarId, tomorrow) == 1)
+                }
+            }
+            removed
         }
         if (deleted) refreshReminder(calendarId)
         return deleted
