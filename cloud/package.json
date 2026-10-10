@@ -1,0 +1,23 @@
+{
+  "name": "personal-calendar-cloud",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "check": "tsc --noEmit",
+    "cdk": "cdk",
+    "synth": "cdk synth --strict"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1145.0",
+    "aws-cdk-lib": "2.272.0",
+    "constructs": "10.5.0"
+  },
+  "devDependencies": {
+    "aws-cdk": "2.1144.0",
+    "@types/node": "24.0.0",
+    "typescript": "5.9.3",
+    "tsx": "4.20.6",
+    "esbuild": "0.25.12"
+  }
+}

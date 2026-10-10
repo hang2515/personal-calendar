@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- 透明镂空保留日历分隔线和打卡勾，系统统一着色后仍可辨认。 -->
+    <path android:fillColor="#FFFFFF" android:fillType="evenOdd"
+        android:pathData="M39,34H69Q79,34 79,44V69Q79,79 69,79H39Q29,79 29,69V44Q29,34 39,34Z M39,44H69Q71,44 71,46Q71,48 69,48H39Q37,48 37,46Q37,44 39,44Z M41.2,57.2Q43,55.4 44.8,57.2L51,63.4L63.2,51.2Q65,49.4 66.8,51.2Q68.6,53 66.8,54.8L52.8,68.8Q51,70.6 49.2,68.8L41.2,60.8Q39.4,59 41.2,57.2Z" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="4.5"
+        android:strokeLineCap="round" android:pathData="M42,29V38M66,29V38" />
+</vector>

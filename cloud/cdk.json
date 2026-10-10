@@ -1,0 +1,4 @@
+{
+  "app": "npx tsx bin/app.ts",
+  "context": { "stage": "dev", "region": "ap-east-1", "@aws-cdk/core:defaultCrossStackReferences": "strong" }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- 主图形保留在自适应图标安全区，交由启动器裁切外轮廓。 -->
+    <path android:fillColor="#F8F7EC"
+        android:pathData="M39,34H69Q79,34 79,44V69Q79,79 69,79H39Q29,79 29,69V44Q29,34 39,34Z" />
+    <path android:strokeColor="#B9D4B7" android:strokeWidth="4.5"
+        android:strokeLineCap="round" android:pathData="M42,29V38M66,29V38" />
+    <path android:strokeColor="#DAE5D4" android:strokeWidth="2"
+        android:strokeLineCap="round" android:pathData="M38,46H70" />
+    <path android:strokeColor="#35664C" android:strokeWidth="5"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M43,59L51,67L65,53" />
+</vector>
