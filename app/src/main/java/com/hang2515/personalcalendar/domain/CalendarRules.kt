@@ -54,9 +54,10 @@ fun monthlyProgress(
     var completed = 0
     for (day in 1..month.lengthOfMonth()) {
         val date = month.atDay(day)
-        if (!date.isAfter(today) && isPlanned(date)) {
+        if (isPlanned(date)) {
             planned++
-            if (date in completedDates) completed++
+            // 分母包含全月安排，分子仍排除未来打卡及不属于计划的记录。
+            if (!date.isAfter(today) && date in completedDates) completed++
         }
     }
     return MonthlyProgress(planned, completed)

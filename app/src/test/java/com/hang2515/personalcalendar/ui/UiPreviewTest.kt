@@ -26,6 +26,7 @@ import java.io.File
 @Config(sdk = [36], qualifiers = "w393dp-h852dp-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class UiPreviewTest {
+    private val remainingMonthDays: Int get() = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).let { it.lengthOfMonth() - it.dayOfMonth + 1 }
     @get:Rule(order = 0) val workManagerRule = object : ExternalResource() {
         override fun before() { WorkManagerTestInitHelper.initializeTestWorkManager(RuntimeEnvironment.getApplication()) }
         override fun after() { WorkManager.getInstance(RuntimeEnvironment.getApplication()).cancelAllWork().result.get() }
@@ -59,7 +60,7 @@ class UiPreviewTest {
         capture("time-picker", compose.onNodeWithText("提醒时间").onParent().onParent())
         compose.onNodeWithText("取消").performClick()
         compose.onNodeWithText("创建日历").performScrollTo().performClick()
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("本月 0 / 1 天").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("本月 0 / $remainingMonthDays 天").fetchSemanticsNodes().isNotEmpty() }
         capture("calendars")
         compose.onNodeWithText("今天").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("完成打卡").fetchSemanticsNodes().isNotEmpty() }

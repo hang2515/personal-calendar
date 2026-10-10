@@ -92,6 +92,7 @@ class CloudAuth(context: Context) {
             .setScopes("openid", "email", "personal-calendar/backup")
             // prompt 是 AppAuth 内置参数，放入 additionalParameters 会在打开浏览器前抛出异常。
             .setPrompt(AuthorizationRequest.Prompt.LOGIN)
+            .setAdditionalParameters(mapOf("lang" to "zh-CN"))
             .build()
     }
 

@@ -56,6 +56,12 @@ npx.cmd cdk synth --strict --profile my-aws
 
 ## 验收
 
+### 中文登录配置（0.3.2）
+
+登录域名使用 Cognito Managed Login v2，现有 Android 客户端通过 `AWS::Cognito::ManagedLoginBranding` 绑定默认样式。授权请求显式携带 `lang=zh-CN`，从登录页进入注册或找回密码页面时继续保留中文。Classic Hosted UI 不支持该本地化能力，不能只给旧版链接增加语言参数。
+
+沿用现有 Essentials 用户池、客户端、PKCE、权限范围与密码策略，不新建账号库或更换用户池。更新登录版本后浏览器会话需要重新登录。邮件模板不由页面语言参数控制，实际收信和手机回跳需另行验收。详见[整月计划与中文登录](整月计划与中文登录.md)。
+
 ### 2026-10-03 部署核验
 
 - 测试及生产环境的 Data、Service 堆栈均已部署至香港；生产 Budget 堆栈部署至美国东部。

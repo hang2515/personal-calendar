@@ -36,6 +36,7 @@ class CalendarDatabaseTest {
             dao.upsertScheduleChange(ScheduleChangeEntity("daily", "2026-09-01", 127))
             dao.upsertScheduleChange(ScheduleChangeEntity("daily", "2026-10-02", 0))
             dao.upsertScheduleChange(ScheduleChangeEntity("daily", "2026-10-04", 127))
+            dao.upsertScheduleChange(ScheduleChangeEntity("daily", "2026-10-06", 0))
             dao.upsertScheduleChange(ScheduleChangeEntity("weekdays", "2026-10-01", 31))
             listOf("2026-09-30", "2026-10-01", "2026-10-03", "2026-10-05").forEach {
                 dao.insertCheckIn(CheckInEntity("daily", it))
@@ -43,9 +44,9 @@ class CalendarDatabaseTest {
             dao.insertCheckIn(CheckInEntity("weekdays", "2026-10-02"))
             val progress = CalendarRepository(database).observeMonthlyProgress(LocalDate.of(2026, 10, 4)).first()
             assertEquals(2, progress.size)
-            assertEquals(2, progress.getValue("daily").plannedDays)
+            assertEquals(3, progress.getValue("daily").plannedDays)
             assertEquals(1, progress.getValue("daily").completedDays)
-            assertEquals(2, progress.getValue("weekdays").plannedDays)
+            assertEquals(22, progress.getValue("weekdays").plannedDays)
             assertEquals(1, progress.getValue("weekdays").completedDays)
         } finally { database.close() }
     }

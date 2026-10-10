@@ -10,6 +10,10 @@ test('backup resources require private storage, token scopes and conditional-cap
   data.hasResourceProperties('AWS::S3::Bucket',{VersioningConfiguration:{Status:'Enabled'},
     PublicAccessBlockConfiguration:{BlockPublicAcls:true,BlockPublicPolicy:true,IgnorePublicAcls:true,RestrictPublicBuckets:true}});
   data.hasResourceProperties('AWS::Cognito::UserPoolClient',{GenerateSecret:false,AllowedOAuthFlows:['code'],EnableTokenRevocation:true});
+  data.hasResourceProperties('AWS::Cognito::UserPoolDomain',{ManagedLoginVersion:2});
+  data.hasResourceProperties('AWS::Cognito::ManagedLoginBranding',{
+    UserPoolId:{Ref:Match.anyValue()},ClientId:{Ref:Match.anyValue()},UseCognitoProvidedValues:true,
+  });
   api.allResourcesProperties('AWS::ApiGatewayV2::Route',{AuthorizationType:'JWT',AuthorizationScopes:['personal-calendar/backup']});
   api.hasResourceProperties('AWS::Lambda::Function',{VpcConfig:Match.absent()});
 });

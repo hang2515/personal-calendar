@@ -29,6 +29,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class CalendarFlowTest {
+    private val remainingMonthDays: Int get() = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).let { it.lengthOfMonth() - it.dayOfMonth + 1 }
     @get:Rule(order = 0) val workManagerRule = object : ExternalResource() {
         override fun before() {
             WorkManagerTestInitHelper.initializeTestWorkManager(RuntimeEnvironment.getApplication())
@@ -77,7 +78,7 @@ class CalendarFlowTest {
         composeRule.onNodeWithContentDescription("日历预览：散步，每天，提醒关闭").assertExists()
         composeRule.onNodeWithText("创建日历").performScrollTo().performClick()
         composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("本月 0 / 1 天").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("本月 0 / $remainingMonthDays 天").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("今天").performClick()
         composeRule.waitUntil(10_000) {
@@ -89,7 +90,7 @@ class CalendarFlowTest {
         }
         composeRule.onNodeWithText("日历").performClick()
         composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("本月 1 / 1 天").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("本月 1 / $remainingMonthDays 天").fetchSemanticsNodes().isNotEmpty()
         }
     }
 
@@ -134,7 +135,7 @@ class CalendarFlowTest {
         }
         composeRule.onNodeWithText("日历").performClick()
         composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("本月 0 / 1 天").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("本月 0 / $remainingMonthDays 天").fetchSemanticsNodes().isNotEmpty()
         }
         // 月历位于惰性列表的屏外项，先让列表定位并组合该项，再点击入口。
         composeRule.onNode(hasScrollToNodeAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))

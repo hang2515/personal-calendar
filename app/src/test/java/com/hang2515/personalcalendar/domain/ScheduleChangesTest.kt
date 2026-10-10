@@ -32,7 +32,7 @@ class ScheduleChangesTest {
             completedDates = setOf(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 4)),
         ) { date -> isScheduled(date, changes.first().date, scheduleMaskOn(date, changes)) }
 
-        assertEquals(2, progress.plannedDays)
+        assertEquals(5, progress.plannedDays)
         assertEquals(1, progress.completedDays)
     }
 }

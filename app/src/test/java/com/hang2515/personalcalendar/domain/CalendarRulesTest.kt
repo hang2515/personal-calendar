@@ -33,17 +33,17 @@ class CalendarRulesTest {
     }
 
     @Test
-    fun monthlyProgressExcludesFutureAndUnscheduledDays() {
+    fun monthlyProgressIncludesFuturePlansButNeverFutureCheckIns() {
         val everyDay = weekdayMask(DayOfWeek.entries.toSet())
         val progress = monthlyProgress(
             month = java.time.YearMonth.of(2026, 10),
             today = today,
             startDate = LocalDate.of(2026, 9, 1),
             weekdayMask = everyDay,
-            completedDates = setOf(today),
+            completedDates = setOf(today, today.plusDays(1)),
         )
 
-        assertEquals(1, progress.plannedDays)
+        assertEquals(31, progress.plannedDays)
         assertEquals(1, progress.completedDays)
     }
 
@@ -57,7 +57,22 @@ class CalendarRulesTest {
             completedDates = setOf(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 6)),
         )
 
-        assertEquals(2, progress.plannedDays)
+        assertEquals(9, progress.plannedDays)
         assertEquals(1, progress.completedDays)
+    }
+
+    @Test fun dailyCalendarCreatedOnOctoberThirdHasTwentyNinePlansAndTwoCompletions() {
+        val progress = monthlyProgress(java.time.YearMonth.of(2026, 10), LocalDate.of(2026, 10, 10),
+            LocalDate.of(2026, 10, 3), 127, setOf(LocalDate.of(2026, 10, 3), LocalDate.of(2026, 10, 8)))
+        assertEquals(MonthlyProgress(29, 2), progress)
+    }
+
+    @Test fun monthBoundariesRespectCreationLeapYearAndFutureMonth() {
+        val start = LocalDate.of(2028, 2, 28)
+        val today = LocalDate.of(2028, 2, 28)
+        assertEquals(MonthlyProgress(0, 0), monthlyProgress(java.time.YearMonth.of(2028, 1), today, start, 127, emptySet()))
+        assertEquals(MonthlyProgress(2, 1), monthlyProgress(java.time.YearMonth.of(2028, 2), today, start, 127, setOf(start)))
+        assertEquals(MonthlyProgress(31, 0), monthlyProgress(java.time.YearMonth.of(2028, 3), today, start, 127,
+            setOf(LocalDate.of(2028, 3, 1))))
     }
 }

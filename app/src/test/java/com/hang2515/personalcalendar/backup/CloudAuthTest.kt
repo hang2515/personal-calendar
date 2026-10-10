@@ -66,6 +66,7 @@ class CloudAuthTest {
         val uri = request.toUri()
         assertEquals("https://example.auth.example.com/oauth2/authorize", uri.buildUpon().clearQuery().build().toString())
         assertEquals("login", uri.getQueryParameter("prompt"))
+        assertEquals("zh-CN", uri.getQueryParameter("lang"))
         assertEquals("code", uri.getQueryParameter("response_type"))
         assertEquals("com.hang2515.personalcalendar://oauth/callback", uri.getQueryParameter("redirect_uri"))
         assertEquals(setOf("openid", "email", "personal-calendar/backup"), uri.getQueryParameter("scope")!!.split(" ").toSet())

@@ -42,7 +42,11 @@ export class DataStack extends Stack {
         callbackUrls:['com.hang2515.personalcalendar://oauth/callback'],
         logoutUrls:['com.hang2515.personalcalendar://oauth/logout']}});
     this.domain = this.pool.addDomain('Login',{cognitoDomain:{domainPrefix:`personal-calendar-${props.stage}-${this.account}`},
-      managedLoginVersion:cognito.ManagedLoginVersion.CLASSIC_HOSTED_UI});
+      managedLoginVersion:cognito.ManagedLoginVersion.NEWER_MANAGED_LOGIN});
+    // API/CDK 创建的客户端不会自动获得样式；缺少此资源时新版登录页不可用。
+    const branding = new cognito.CfnManagedLoginBranding(this,'LoginBranding',{
+      userPoolId:this.pool.userPoolId, clientId:this.client.userPoolClientId, useCognitoProvidedValues:true});
+    branding.node.addDependency(this.domain);
     new CfnOutput(this,'UserPoolId',{value:this.pool.userPoolId});
     new CfnOutput(this,'ClientId',{value:this.client.userPoolClientId});
     new CfnOutput(this,'AuthDomain',{value:this.domain.baseUrl()});

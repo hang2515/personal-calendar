@@ -141,7 +141,7 @@ fun CalendarDetailScreen(
                 val progress = monthlyProgress(month, today, completedDates) { date ->
                     isScheduled(date, calendar.startLocalDate(), scheduleMaskOn(date, ruleChanges))
                 }
-                ProgressSummary("本月完成情况", progress.completedDays, progress.plannedDays, accentColor = palette.accent, containerColor = palette.pale)
+                ProgressSummary("全月计划进度", progress.completedDays, progress.plannedDays, accentColor = palette.accent, containerColor = palette.pale)
                 Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         CalendarMonthGrid(month, today, calendar, ruleChanges, completedDates)

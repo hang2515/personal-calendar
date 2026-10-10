@@ -40,7 +40,7 @@ class CalendarRepository(
     fun observeMonthlyProgress(today: LocalDate) = combine(
         dao.observeCalendars(),
         dao.observeAllCheckInsInMonth(today.withDayOfMonth(1).toString(), today.toString()),
-        dao.observeAllChangesInMonth(today.withDayOfMonth(1).toString(), today.toString()),
+        dao.observeAllChangesInMonth(today.withDayOfMonth(1).toString(), YearMonth.from(today).atEndOfMonth().toString()),
     ) { calendars, checkIns, changes ->
         val datesByCalendar = checkIns.groupBy { it.calendarId }
         val changesByCalendar = changes.groupBy { it.calendarId }

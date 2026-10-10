@@ -234,7 +234,7 @@ private fun CalendarListPreview(
                     val progress = monthlyProgress(month, today, completedDates) { date ->
                         isScheduled(date, calendar.startLocalDate(), scheduleMaskOn(date, ruleChanges))
                     }
-                    ProgressSummary("${calendar.name} · 本月", progress.completedDays, progress.plannedDays,
+                    ProgressSummary("${calendar.name} · 全月计划", progress.completedDays, progress.plannedDays,
                         accentColor = calendarPalette(calendar.colorKey).accent,
                         containerColor = calendarPalette(calendar.colorKey).pale)
                     CalendarMonthGrid(month, today, calendar, ruleChanges, completedDates)
