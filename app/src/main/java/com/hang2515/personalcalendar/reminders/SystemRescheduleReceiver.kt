@@ -26,6 +26,8 @@ class SystemRescheduleReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 ReminderScheduler.open(context).refreshAll()
+                com.hang2515.personalcalendar.backup.BackupWork.schedule(context,
+                    replace = intent.action == Intent.ACTION_TIME_CHANGED || intent.action == Intent.ACTION_TIMEZONE_CHANGED)
             } catch (error: Exception) {
                 Log.e("ReminderReceiver", "重新安排提醒失败：${error.javaClass.simpleName}")
             } finally {

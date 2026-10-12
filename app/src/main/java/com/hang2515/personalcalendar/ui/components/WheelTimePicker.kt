@@ -28,7 +28,7 @@ import kotlin.math.roundToInt
 /** 只在确认时提交；滚动和取消不会修改表单里的提醒时间。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WheelTimePicker(initialMinute: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
+fun WheelTimePicker(initialMinute: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit, title: String = "提醒时间") {
     val hours = rememberLazyListState(initialFirstVisibleItemIndex = initialMinute / 60)
     val minutes = rememberLazyListState(initialFirstVisibleItemIndex = initialMinute % 60)
     val hour by remember { derivedStateOf { hours.centeredValue(initialMinute / 60) } }
@@ -38,7 +38,7 @@ fun WheelTimePicker(initialMinute: Int, onDismiss: () -> Unit, onConfirm: (Int) 
         containerColor = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            PageHeading("提醒时间", "上下滑动选择 · 北京时间")
+            PageHeading(title, "上下滑动选择 · 北京时间")
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Box(Modifier.fillMaxWidth().height(rowHeight).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp)))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
