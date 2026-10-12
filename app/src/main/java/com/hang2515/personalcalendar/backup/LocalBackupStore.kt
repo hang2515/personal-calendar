@@ -22,10 +22,10 @@ class LocalBackupStore(private val database: CalendarDatabase) {
             .also { BackupSnapshot.decode(it.encode()) }
     }
 
-    suspend fun bind(account: String, expectedRevision: Long, etag: String?) = database.withTransaction {
+    suspend fun bind(account: String, expectedRevision: Long, etag: String?, automatic: Boolean = true) = database.withTransaction {
         val current = state()
         require(current.localRevision == expectedRevision) { "本地数据已变化，请重新确认" }
-        check(states.update(current.copy(boundAccountSub = account, backupEnabled = true,
+        check(states.update(current.copy(boundAccountSub = account, backupEnabled = automatic,
             lastBackedUpRevision = null, lastBackupAt = null, cloudETag = etag)) == 1)
     }
 
@@ -43,7 +43,7 @@ class LocalBackupStore(private val database: CalendarDatabase) {
         val snapshot = BackupSnapshot.decode(body)
         return database.withTransaction {
             val current = state()
-            require(current.localRevision == expectedRevision) { "本地数据已变化，请重新预览备份" }
+            require(current.localRevision == expectedRevision) { "本地数据已变化，请重新读取云备份" }
             val previousIds = calendars.getCalendarIds()
             // 此入口只在用户确认整份替换后调用；删除精确限定为当前本地日历 ID。
             previousIds.chunked(500).forEach { calendars.deleteCalendars(it) }

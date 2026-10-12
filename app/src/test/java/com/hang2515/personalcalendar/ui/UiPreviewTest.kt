@@ -70,7 +70,7 @@ class UiPreviewTest {
         compose.onNodeWithContentDescription("撤销打卡").assertIsDisplayed()
         capture("completed")
         compose.onNodeWithText("我的").performClick()
-        compose.onNodeWithText("云备份").assertIsDisplayed()
+        compose.onNodeWithText("云备份设置").assertIsDisplayed()
         capture("profile")
         compose.onNodeWithText("通知与提醒").performClick()
         compose.onNodeWithText("通知与提醒设置").assertIsDisplayed()

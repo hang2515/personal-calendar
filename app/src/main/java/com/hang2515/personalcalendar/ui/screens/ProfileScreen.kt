@@ -2,6 +2,7 @@ package com.hang2515.personalcalendar.ui.screens
 
 import android.content.Intent
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -45,6 +47,14 @@ fun ProfileScreen(permissionRevision: Int, modifier: Modifier = Modifier) {
     var accountEmail by remember { mutableStateOf<String?>(null) }
     var section by remember { mutableStateOf<String?>(null) }
     var shareError by remember { mutableStateOf<String?>(null) }
+    var showBackupSettings by rememberSaveable { mutableStateOf(false) }
+    val accountChanged: (Boolean, String?) -> Unit = { signedIn, email -> isSignedIn = signedIn; accountEmail = email }
+    if (showBackupSettings) {
+        BackHandler { showBackupSettings = false }
+        CloudBackupCard(onAccountChanged = accountChanged, settingsOpen = true,
+            onCloseSettings = { showBackupSettings = false }, modifier = modifier)
+        return
+    }
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -57,7 +67,7 @@ fun ProfileScreen(permissionRevision: Int, modifier: Modifier = Modifier) {
                 Text(if (isSignedIn) accountEmail ?: "账号已登录" else "无需登录，也能记录每一天", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        CloudBackupCard { signedIn, email -> isSignedIn = signedIn; accountEmail = email }
+        CloudBackupCard(onAccountChanged = accountChanged, onOpenSettings = { showBackupSettings = true })
         Text("偏好与支持", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             ProfileSetting("通知与提醒", "权限与准时提醒", Icons.Outlined.Notifications, onClick = { section = "notifications" })
@@ -86,17 +96,17 @@ fun ProfileScreen(permissionRevision: Int, modifier: Modifier = Modifier) {
                         Text("旅行或修改手机时区不会改变已有打卡归属。当前版本固定此时区，不提供切换，提醒时间也按北京时间执行。")
                     }
                     "privacy" -> {
-                        Text("日历和打卡首先保存在本机。未登录或未开启云备份时，不上传这些记录。")
+                        Text("日历和打卡首先保存在本机。登录后可手动备份，也可单独开启每天自动备份。")
                         Text("开启云备份后，日历、历史规则和打卡上传至 AWS 香港区域的私有加密存储。密码由 Cognito 管理，手机只加密保存登录令牌。")
-                        Text("恢复会替换本机全部日历，必须预览并确认。换机、卸载或清除应用数据前，请先确认最近备份成功。")
+                        Text("恢复会替换本机全部日历，必须先读取云备份并确认。换机、卸载或清除应用数据前，请先确认最近备份成功。")
                         Text("在日历详情可以删除该日历。退出登录保留本机数据，也不会删除已有云备份；关闭备份后，云端仍保留上次快照。")
                         Text("当前版本不提供账号注销或彻底删除云备份入口。如需清除云端数据，请联系应用维护者处理当前及历史版本。")
                     }
                     else -> {
                         Text("1. 在“日历”新建目标，设置重复星期、图标、颜色和提醒。可用预览检查效果。")
-                        Text("2. 在“今天”或日历详情打卡；误操作仅能在当天撤销。过去的漏打卡不能补签，未安排日期不计入完成率。")
+                        Text("2. 在“今天”或日历详情打卡；历史漏签可在日历详情点击日期补签，也可确认撤销历史打卡。未来或未安排日期不能补签。")
                         Text("3. 提醒需要通知权限；省电限制可能影响送达。在“我的 → 通知与提醒”检查权限，并查看手机的应用后台设置。")
-                        Text("4. 登录后预览云备份，确认开启或恢复。当前是整份备份；多部手机发生冲突时，请先预览再决定覆盖，记录不会自动合并。")
+                        Text("4. 在“云备份设置”选择立即备份、读取云备份或每天自动备份时间。恢复会整份替换本机记录；多部手机发生冲突时，请先读取再决定恢复或重新上传。")
                         Text("反馈时请填写操作步骤、预期与实际结果。下方只分享应用和系统版本，不自动附带账号或日历内容；由你选择接收人并发送。")
                         TextButton(onClick = {
                             try {

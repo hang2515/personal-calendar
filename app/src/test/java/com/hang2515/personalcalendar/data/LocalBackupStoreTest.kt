@@ -14,6 +14,15 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class LocalBackupStoreTest {
+    @Test fun manualBindingDoesNotEnableAutomaticBackup() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), CalendarDatabase::class.java).build()
+        try {
+            val store = LocalBackupStore(database)
+            store.bind("account", 0, null, automatic = false)
+            assertFalse(store.state().backupEnabled)
+            assertEquals("account", store.state().boundAccountSub)
+        } finally { database.close() }
+    }
     @Test
     fun failedInsertDuringRestoreRollsBackDeletedCalendarsAndBackupState() = runBlocking {
         val database = Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), CalendarDatabase::class.java).build()

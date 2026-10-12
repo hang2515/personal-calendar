@@ -1,6 +1,7 @@
 package com.hang2515.personalcalendar.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,6 +88,7 @@ fun CalendarDetailScreen(
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var historicalChoice by remember { mutableStateOf<Pair<LocalDate, Boolean>?>(null) }
     val palette = calendarPalette(calendar.colorKey)
 
     Column(
@@ -144,10 +146,13 @@ fun CalendarDetailScreen(
                 ProgressSummary("全月计划进度", progress.completedDays, progress.plannedDays, accentColor = palette.accent, containerColor = palette.pale)
                 Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        CalendarMonthGrid(month, today, calendar, ruleChanges, completedDates)
+                        CalendarMonthGrid(month, today, calendar, ruleChanges, completedDates,
+                            onHistoricalDate = { date -> if (!isSaving) historicalChoice = date to (date in completedDates) })
                     }
                 }
                 CalendarStatusLegend()
+                Text("点击过去的计划日可补签或撤销打卡。", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (YearMonth.from(today) == month && isScheduled(today, calendar.startLocalDate(), scheduleMaskOn(today, ruleChanges))) {
                     if (today in completedDates) {
                         CompletedCheckIn(
@@ -190,6 +195,23 @@ fun CalendarDetailScreen(
         }
         if (saveError) Text("操作未完成，请重试。", color = MaterialTheme.colorScheme.error)
     }
+    historicalChoice?.let { (date, completed) ->
+        AlertDialog(onDismissRequest = { if (!isSaving) historicalChoice = null },
+            title = { Text(if (completed) "撤销历史打卡？" else "补签这一天？") },
+            text = { Text("${calendar.name} · $date\n" + if (completed) "将移除这一天的完成记录，月度进度会重新计算。" else "确认这一天已完成，补签后会计入月度进度。") },
+            confirmButton = { TextButton(enabled = !isSaving, onClick = {
+                isSaving = true; saveError = false
+                scope.launch {
+                    try {
+                        if (completed) repository.undoHistoricalCheckIn(calendar.id, date) else repository.backfill(calendar.id, date)
+                        historicalChoice = null
+                    } catch (error: kotlinx.coroutines.CancellationException) { throw error }
+                    catch (_: Exception) { saveError = true }
+                    finally { isSaving = false }
+                }
+            }) { Text(if (completed) "确认撤销" else "确认补签") } },
+            dismissButton = { TextButton(enabled = !isSaving, onClick = { historicalChoice = null }) { Text("取消") } })
+    }
     if (showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = { if (!isDeleting) showDeleteConfirmation = false },
@@ -199,7 +221,7 @@ fun CalendarDetailScreen(
                 TextButton(
                     onClick = {
                         isDeleting = true
-                        scope.launch {
+                        repository.confirmedOperationScope.launch {
                             try {
                                 if (repository.deleteCalendar(calendar.id)) {
                                     showDeleteConfirmation = false
@@ -235,6 +257,7 @@ internal fun CalendarMonthGrid(
     calendar: CalendarEntity,
     changes: List<ScheduleChange>,
     completedDates: Set<LocalDate>,
+    onHistoricalDate: ((LocalDate) -> Unit)? = null,
 ) {
     val weekdays = listOf("日", "一", "二", "三", "四", "五", "六")
     val palette = calendarPalette(calendar.colorKey)
@@ -272,7 +295,11 @@ internal fun CalendarMonthGrid(
                         DayStatus.UPCOMING -> "未来待完成"
                         DayStatus.UNSCHEDULED -> "未安排"
                     }
-                    Box(modifier = Modifier.weight(1f).height(cellHeight).semantics { contentDescription = "${date}，$statusText" }, contentAlignment = Alignment.Center) {
+                    val canEditHistory = onHistoricalDate != null && date.isBefore(today) &&
+                        (status == DayStatus.MISSED || status == DayStatus.COMPLETED)
+                    Box(modifier = Modifier.weight(1f).height(cellHeight)
+                        .then(if (canEditHistory) Modifier.clickable { onHistoricalDate?.invoke(date) } else Modifier)
+                        .semantics { contentDescription = "${date}，$statusText" }, contentAlignment = Alignment.Center) {
                         Surface(
                             modifier = Modifier.widthIn(max = 42.dp).fillMaxWidth().height(markerHeight),
                             color = background,

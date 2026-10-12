@@ -13,6 +13,9 @@ import java.time.Clock
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import com.hang2515.personalcalendar.domain.ScheduleChange
 import com.hang2515.personalcalendar.domain.monthlyProgress
 import com.hang2515.personalcalendar.domain.scheduleMaskOn
@@ -21,9 +24,11 @@ class CalendarRepository(
     private val database: CalendarDatabase,
     private val clock: Clock = Clock.system(ZoneId.of("Asia/Shanghai")),
     private val reminderScheduler: ReminderScheduler? = null,
-    private val onChanged: (() -> Unit)? = null,
+    private val onChanged: (suspend () -> Unit)? = null,
 ) {
     private val dao = database.calendarDao()
+    // 确认删除后页面会随数据库流移除，必要的事务后处理须独立于页面生命周期。
+    internal val confirmedOperationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     fun observeCalendars() = dao.observeCalendars()
 
@@ -149,6 +154,33 @@ class CalendarRepository(
         return inserted
     }
 
+    suspend fun backfill(calendarId: String, date: LocalDate): Boolean {
+        val inserted = database.withTransaction {
+            require(date.isBefore(LocalDate.now(clock))) { "只能补签过去的计划日" }
+            val calendar = dao.getCalendar(calendarId) ?: throw IllegalArgumentException("日历不存在")
+            val mask = dao.getScheduleMaskOn(calendarId, date.toString()) ?: 0
+            require(isScheduled(date, calendar.startLocalDate(), mask)) { "这一天没有安排打卡" }
+            (dao.insertCheckIn(CheckInEntity(calendarId, date.toString())) != -1L).also {
+                if (it) database.localStateDao().recordChange()
+            }
+        }
+        // 历史补签不移动排期、不清除今天的通知，只让下一次备份读取新版本。
+        if (inserted) onChanged?.invoke()
+        return inserted
+    }
+
+    suspend fun undoHistoricalCheckIn(calendarId: String, date: LocalDate): Boolean {
+        val deleted = database.withTransaction {
+            require(date.isBefore(LocalDate.now(clock))) { "只能在这里撤销过去的打卡" }
+            requireNotNull(dao.getCalendar(calendarId)) { "日历不存在" }
+            (dao.deleteCheckIn(calendarId, date.toString()) == 1).also {
+                if (it) database.localStateDao().recordChange()
+            }
+        }
+        if (deleted) onChanged?.invoke()
+        return deleted
+    }
+
     suspend fun undoCheckIn(calendarId: String, today: LocalDate): Boolean {
         val deleted = database.withTransaction {
             require(today == LocalDate.now(clock)) { "只能撤销今天的打卡" }
@@ -193,9 +225,10 @@ class CalendarRepository(
 
     companion object {
         fun open(context: Context): CalendarRepository {
-            val database = CalendarDatabase.open(context)
-            return CalendarRepository(database, reminderScheduler = ReminderScheduler(context, database),
-                onChanged = { com.hang2515.personalcalendar.backup.BackupWork.schedule(context) })
+            val appContext = context.applicationContext
+            val database = CalendarDatabase.open(appContext)
+            return CalendarRepository(database, reminderScheduler = ReminderScheduler(appContext, database),
+                onChanged = { com.hang2515.personalcalendar.backup.BackupWork.schedule(appContext) })
         }
     }
 }

@@ -14,7 +14,13 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
-data class BackupPreview(val account: String, val revision: Long, val backup: BackupResponse?)
+data class BackupPreview(val account: String, val revision: Long, val backup: BackupResponse?) {
+    internal fun requireUnchanged(current: BackupResponse): BackupResponse {
+        val selected = requireNotNull(backup) { "此账号尚无云备份" }
+        require(current.etag == selected.etag) { "云备份已有更新，请重新读取后恢复" }
+        return selected
+    }
+}
 
 class BackupCoordinator private constructor(private val context: Context) {
     // 用户确认后的上传/恢复不因底栏切页而取消，避免事务提交后遗漏提醒重排。
@@ -22,6 +28,7 @@ class BackupCoordinator private constructor(private val context: Context) {
     private val database = CalendarDatabase.open(context)
     val local = LocalBackupStore(database)
     val auth = CloudAuth(context)
+    val timeSettings = BackupTimeSettings(context)
     private val api = BackupApi()
     private val mutex = Mutex()
     private val pending = AtomicFile(File(context.noBackupFilesDir, "pending-cloud-backup.json"))
@@ -47,18 +54,37 @@ class BackupCoordinator private constructor(private val context: Context) {
 
     suspend fun enable(preview: BackupPreview) = mutex.withLock {
         val account = auth.account(auth.token())
-        require(account == preview.account) { "账号已变化，请重新预览" }
+        require(account == preview.account) { "账号已变化，请重新读取云备份" }
         // 覆盖使用用户预览时的 ETag，确认后云端再次更新仍会产生冲突。
         local.bind(account, preview.revision, preview.backup?.etag)
         pending.delete()
         recordError(null)
+        BackupWork.schedule(context, replace = true)
+    }
+
+    suspend fun setBackupTime(minute: Int) = mutex.withLock {
+        withContext(Dispatchers.IO) { timeSettings.save(minute) }
+        BackupWork.schedule(context, replace = true)
+    }
+
+    suspend fun backupNow(preview: BackupPreview): Boolean = mutex.withLock {
+        check(CloudConfig.isConfigured) { "此安装包尚未配置云服务" }
+        val account = auth.account(auth.token())
+        require(account == preview.account) { "账号已变化，请重新读取云备份" }
+        val current = local.state()
+        val keepAutomatic = current.backupEnabled && current.boundAccountSub == account
+        local.bind(account, preview.revision, preview.backup?.etag, automatic = keepAutomatic)
+        pending.delete()
+        recordError(null)
         BackupWork.schedule(context)
+        uploadLocked(force = true)
     }
 
     suspend fun restore(preview: BackupPreview) = mutex.withLock {
         val account = auth.account(auth.token())
-        require(account == preview.account) { "账号已变化，请重新预览" }
-        val backup = requireNotNull(preview.backup) { "此账号尚无云备份" }
+        require(account == preview.account) { "账号已变化，请重新读取云备份" }
+        requireNotNull(preview.backup) { "此账号尚无云备份" }
+        val backup = preview.requireUnchanged(api.request(auth.token(), "GET", snapshot = true))
         val previousIds = local.restore(backup.body, account, backup.etag, preview.revision)
         BackupWork.cancel(context); pending.delete(); recordError(null)
         val reminders = ReminderScheduler.open(context)
@@ -72,17 +98,19 @@ class BackupCoordinator private constructor(private val context: Context) {
     }
 
     /** 返回 false 表示上传期间仍有新修改，后台继续处理。 */
-    suspend fun upload(): Boolean = mutex.withLock {
-        if (!CloudConfig.isConfigured) return@withLock true
+    suspend fun upload(): Boolean = mutex.withLock { uploadLocked(force = false) }
+
+    private suspend fun uploadLocked(force: Boolean): Boolean {
+        if (!CloudConfig.isConfigured) return true
         val state = local.state()
-        if (!state.backupEnabled) return@withLock true
+        if (!force && !state.backupEnabled) return true
         val token = auth.token()
         val account = auth.account(token)
         require(account == state.boundAccountSub) { "本地记录属于另一备份账号，请重新绑定" }
         val envelope = withContext(Dispatchers.IO) {
             if (pending.baseFile.exists()) JSONObject(String(pending.readFully(), Charsets.UTF_8)) else null
         }
-        if (state.localRevision == state.lastBackedUpRevision && envelope == null) return@withLock true
+        if (state.localRevision == state.lastBackedUpRevision && envelope == null) return true
         val body: String
         val expectedETag: String?
         if (envelope != null) {
@@ -107,7 +135,7 @@ class BackupCoordinator private constructor(private val context: Context) {
         local.markUploaded(snapshot, account, response.etag, receipt.getString("savedAt"))
         pending.delete(); recordError(null)
         val current = local.state()
-        current.localRevision == current.lastBackedUpRevision
+        return current.localRevision == current.lastBackedUpRevision
     }
 
     companion object {

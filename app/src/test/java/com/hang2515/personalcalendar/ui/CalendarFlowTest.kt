@@ -15,6 +15,8 @@ import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.isToggleable
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import com.hang2515.personalcalendar.MainActivity
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
@@ -47,6 +49,21 @@ class CalendarFlowTest {
         composeRule.onNodeWithText("新的坚持").assertExists()
         composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         composeRule.onNodeWithText("我的日历").assertIsDisplayed()
+    }
+
+    @Test fun backupSettingsSeparateUploadAndReadAndAllowChoosingDailyTime() {
+        composeRule.onNodeWithText("我的").performClick()
+        composeRule.onNodeWithText("云备份设置").performScrollTo().performClick()
+        composeRule.onNodeWithText("立即备份").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("读取云备份").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("预览与恢复").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("选择自动备份时间").performScrollTo().performClick()
+        composeRule.onNodeWithText("自动备份时间").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("小时").assertExists()
+        composeRule.onNodeWithContentDescription("分钟").assertExists()
+        composeRule.onNodeWithText("取消").performClick()
+        composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.onNodeWithText("偏好与支持").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -144,8 +161,12 @@ class CalendarFlowTest {
         composeRule.onNodeWithContentDescription("日历管理").performClick()
         composeRule.onNodeWithText("删除日历").performClick()
         composeRule.onNodeWithText("确认删除").performClick()
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("还没有日历").fetchSemanticsNodes().isNotEmpty()
+        try {
+            composeRule.waitUntil(10_000) {
+                composeRule.onAllNodesWithText("还没有日历").fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (error: androidx.compose.ui.test.ComposeTimeoutException) {
+            throw AssertionError("删除后应返回空日历列表：${composeRule.onRoot().printToString()}", error)
         }
     }
 }

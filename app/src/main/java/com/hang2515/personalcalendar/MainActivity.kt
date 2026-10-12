@@ -45,9 +45,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         permissionRevision++
-        com.hang2515.personalcalendar.backup.BackupWork.schedule(this, followUp = false)
         lifecycleScope.launch {
             try {
+                com.hang2515.personalcalendar.backup.BackupWork.schedule(this@MainActivity)
                 ReminderScheduler.open(this@MainActivity).refreshAll()
             } catch (error: CancellationException) {
                 throw error
