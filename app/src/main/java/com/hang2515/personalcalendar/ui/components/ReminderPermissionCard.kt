@@ -11,12 +11,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -25,7 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.hang2515.personalcalendar.reminders.ReminderScheduler
@@ -39,10 +44,11 @@ fun ReminderPermissionCard(permissionRevision: Int, modifier: Modifier = Modifie
     val scope = rememberCoroutineScope()
     var requestRevision by remember { mutableIntStateOf(0) }
     var settingsError by remember { mutableStateOf<String?>(null) }
+    var isChanging by remember { mutableStateOf(false) }
     fun openSettings(intent: Intent) {
         settingsError = null
         try { context.startActivity(intent) }
-        catch (_: ActivityNotFoundException) { settingsError = "无法打开系统设置，请到手机设置中找到个人日历并开启权限。" }
+        catch (_: ActivityNotFoundException) { settingsError = "无法打开系统设置，请到手机设置中找到个人日历并调整通知权限。" }
     }
     fun notificationSettings() = openSettings(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
@@ -61,12 +67,31 @@ fun ReminderPermissionCard(permissionRevision: Int, modifier: Modifier = Modifie
     }
     val canNotify = remember(permissionRevision, requestRevision) { scheduler.canPostNotifications() }
     val canBeExact = remember(permissionRevision, requestRevision) { scheduler.canScheduleExact() }
+    val remindersEnabled = remember(permissionRevision, requestRevision) { scheduler.isNotificationsEnabled() }
     val needsRuntimePermission = Build.VERSION.SDK_INT >= 33 &&
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
 
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("接收提醒通知", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = remindersEnabled, enabled = !isChanging, onCheckedChange = { enabled ->
+                    isChanging = true
+                    settingsError = null
+                    scope.launch {
+                        try { scheduler.setNotificationsEnabled(enabled) }
+                        catch (error: CancellationException) { throw error }
+                        catch (_: Exception) { settingsError = "无法更新提醒设置，请重试。" }
+                        finally { requestRevision++; isChanging = false }
+                    }
+                }, modifier = Modifier.semantics { contentDescription = "接收提醒通知" })
+            }
             when {
+                !remindersEnabled -> {
+                    Text("已关闭所有日历提醒")
+                    Text("各日历的提醒时间仍会保留，重新开启后恢复后续提醒。", style = MaterialTheme.typography.bodySmall)
+                }
                 !canNotify -> {
                     Text("通知尚未开启，提醒不会显示。")
                     TextButton(onClick = {
@@ -76,8 +101,6 @@ fun ReminderPermissionCard(permissionRevision: Int, modifier: Modifier = Modifie
                             notificationSettings()
                         }
                     }) { Text("开启通知") }
-                    // 系统在多次拒绝后可能不再弹窗，始终保留可恢复授权的入口。
-                    if (needsRuntimePermission) TextButton(onClick = ::notificationSettings) { Text("打开通知设置") }
                 }
                 !canBeExact -> {
                     Text("提醒已开启；系统可能延迟送达。")
@@ -91,6 +114,9 @@ fun ReminderPermissionCard(permissionRevision: Int, modifier: Modifier = Modifie
                 }
                 else -> Text("通知与准时提醒已开启。")
             }
+            if (isChanging) Text("正在更新提醒设置…", style = MaterialTheme.typography.bodySmall)
+            // 系统授权无论是否开启，都保留调整或关闭的入口。
+            TextButton(onClick = ::notificationSettings, enabled = !isChanging) { Text("打开通知设置") }
             settingsError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }

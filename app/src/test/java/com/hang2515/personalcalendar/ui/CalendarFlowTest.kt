@@ -9,6 +9,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -17,6 +19,12 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
+import androidx.compose.ui.test.onParent
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.asAndroidBitmap
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import android.graphics.Bitmap
 import com.hang2515.personalcalendar.MainActivity
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
@@ -71,6 +79,38 @@ class CalendarFlowTest {
         org.robolectric.Shadows.shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
         composeRule.onNodeWithText("我的").performClick()
         composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithText("打开通知设置").performScrollTo().assertIsDisplayed().performClick()
+        org.junit.Assert.assertEquals(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS,
+            org.robolectric.Shadows.shadowOf(composeRule.activity).nextStartedActivity.action)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun notificationsCanBeTurnedOffAndBackOnWithoutRevokingSystemPermission() {
+        val application = RuntimeEnvironment.getApplication()
+        org.robolectric.Shadows.shadowOf(application).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        composeRule.onNodeWithText("我的").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("接收提醒通知").assertIsOn().performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("已关闭所有日历提醒").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("接收提醒通知").assertIsOff()
+        val screenshot = File("build/ui-preview/notifications-disabled.png")
+        screenshot.parentFile.mkdirs()
+        screenshot.outputStream().use {
+            composeRule.onNodeWithText("通知与提醒设置").onParent().onParent().captureToImage().asAndroidBitmap()
+                .compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        org.junit.Assert.assertEquals(android.content.pm.PackageManager.PERMISSION_GRANTED,
+            application.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS))
+        composeRule.onNodeWithText("知道了").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("接收提醒通知").assertIsOff().performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("已关闭所有日历提醒").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithContentDescription("接收提醒通知").assertIsOn()
         composeRule.onNodeWithText("打开通知设置").performScrollTo().assertIsDisplayed().performClick()
         org.junit.Assert.assertEquals(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS,
             org.robolectric.Shadows.shadowOf(composeRule.activity).nextStartedActivity.action)
