@@ -25,6 +25,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -38,6 +39,21 @@ class ReminderScheduler(
     private val dao = database.calendarDao()
     private val alarmManager = this.context.getSystemService(AlarmManager::class.java)
     private val notificationManager = this.context.getSystemService(NotificationManager::class.java)
+    private val preferences = this.context.getSharedPreferences("reminder-notification-settings", Context.MODE_PRIVATE)
+
+    fun isNotificationsEnabled(): Boolean = preferences.getBoolean("enabled", true)
+
+    suspend fun setNotificationsEnabled(enabled: Boolean) = withContext(NonCancellable + Dispatchers.IO) {
+        // 保存后必须完成取消或重排；切页不能让关闭操作只执行一半。
+        refreshMutex.withLock {
+            check(preferences.edit().putBoolean("enabled", enabled).commit()) { "通知设置未保存，请重试" }
+            if (!enabled) {
+                NotificationManagerCompat.from(context).cancelAll()
+                dao.getCalendarIds().forEach { alarmManager.cancel(alarmIntent(it)) }
+            }
+        }
+        if (enabled) refreshAll()
+    }
 
     suspend fun refreshAll() {
         dao.getCalendarIds().forEach { calendarId ->
@@ -55,7 +71,7 @@ class ReminderScheduler(
         val alarmIntent = alarmIntent(calendarId)
         alarmManager.cancel(alarmIntent)
         val calendar = dao.getCalendar(calendarId) ?: return@withLock
-        if (!calendar.reminderEnabled || !canPostNotifications()) return@withLock
+        if (!isNotificationsEnabled() || !calendar.reminderEnabled || !canPostNotifications()) return@withLock
 
         val now = ZonedDateTime.now(clock)
         val from = now.toLocalDate()
@@ -84,6 +100,13 @@ class ReminderScheduler(
     }
 
     suspend fun deliver(calendarId: String) {
+        // 与总开关、调度共用锁，避免关闭完成后仍有在途接收器发出通知。
+        withContext(Dispatchers.IO) { refreshMutex.withLock { postReminderIfDue(calendarId) } }
+        refresh(calendarId)
+    }
+
+    private suspend fun postReminderIfDue(calendarId: String) {
+        if (!isNotificationsEnabled()) return
         val calendar = dao.getCalendar(calendarId) ?: return
         val now = ZonedDateTime.now(clock)
         val today = now.toLocalDate()
@@ -116,7 +139,6 @@ class ReminderScheduler(
                 // 权限可能在校验后被撤销；下次进入应用时会重新检查权限并安排提醒。
             }
         }
-        refresh(calendarId)
     }
 
     fun canPostNotifications(): Boolean {
