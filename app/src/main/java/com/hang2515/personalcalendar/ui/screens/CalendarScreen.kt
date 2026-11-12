@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -215,11 +216,12 @@ private fun CalendarListPreview(
     onOpen: () -> Unit,
 ) {
     var monthText by rememberSaveable(calendar.id) { mutableStateOf(YearMonth.from(today).toString()) }
+    var historicalChoice by remember(calendar.id) { mutableStateOf<Pair<LocalDate, Boolean>?>(null) }
     val month = YearMonth.parse(monthText)
     val checkInsFlow = remember(repository, calendar.id, month) { repository.observeCheckInsInMonth(calendar.id, month) }
     val changesFlow = remember(repository, calendar.id, month) { repository.observeChangesInMonth(calendar.id, month) }
-    val checkIns by databaseState(checkInsFlow)
-    val changes by databaseState(changesFlow)
+    val checkIns by key(calendar.id, month) { databaseState(checkInsFlow) }
+    val changes by key(calendar.id, month) { databaseState(changesFlow) }
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             MonthNavigation(month, onPrevious = { monthText = month.minusMonths(1).toString() }, onNext = { monthText = month.plusMonths(1).toString() })
@@ -237,12 +239,17 @@ private fun CalendarListPreview(
                     ProgressSummary("${calendar.name} · 全月计划", progress.completedDays, progress.plannedDays,
                         accentColor = calendarPalette(calendar.colorKey).accent,
                         containerColor = calendarPalette(calendar.colorKey).pale)
-                    CalendarMonthGrid(month, today, calendar, ruleChanges, completedDates)
+                    CalendarMonthGrid(month, today, calendar, ruleChanges, completedDates,
+                        onHistoricalDate = { date -> historicalChoice = date to (date in completedDates) })
                     CalendarStatusLegend()
+                    Text("点击过去的计划日可补签或撤销打卡。", style = MaterialTheme.typography.bodySmall)
                 }
             }
             TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text("查看完整日历") }
         }
+    }
+    historicalChoice?.let { (date, completed) ->
+        HistoricalCheckInDialog(calendar, date, completed, repository) { historicalChoice = null }
     }
 }
 

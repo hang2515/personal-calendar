@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -79,8 +80,8 @@ fun CalendarDetailScreen(
     val month = YearMonth.parse(monthText)
     val checkInsFlow = remember(repository, calendar.id, month) { repository.observeCheckInsInMonth(calendar.id, month) }
     val changesFlow = remember(repository, calendar.id, month) { repository.observeChangesInMonth(calendar.id, month) }
-    val checkIns by databaseState(checkInsFlow)
-    val changes by databaseState(changesFlow)
+    val checkIns by key(calendar.id, month) { databaseState(checkInsFlow) }
+    val changes by key(calendar.id, month) { databaseState(changesFlow) }
     val scope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf(false) }
@@ -196,21 +197,7 @@ fun CalendarDetailScreen(
         if (saveError) Text("操作未完成，请重试。", color = MaterialTheme.colorScheme.error)
     }
     historicalChoice?.let { (date, completed) ->
-        AlertDialog(onDismissRequest = { if (!isSaving) historicalChoice = null },
-            title = { Text(if (completed) "撤销历史打卡？" else "补签这一天？") },
-            text = { Text("${calendar.name} · $date\n" + if (completed) "将移除这一天的完成记录，月度进度会重新计算。" else "确认这一天已完成，补签后会计入月度进度。") },
-            confirmButton = { TextButton(enabled = !isSaving, onClick = {
-                isSaving = true; saveError = false
-                scope.launch {
-                    try {
-                        if (completed) repository.undoHistoricalCheckIn(calendar.id, date) else repository.backfill(calendar.id, date)
-                        historicalChoice = null
-                    } catch (error: kotlinx.coroutines.CancellationException) { throw error }
-                    catch (_: Exception) { saveError = true }
-                    finally { isSaving = false }
-                }
-            }) { Text(if (completed) "确认撤销" else "确认补签") } },
-            dismissButton = { TextButton(enabled = !isSaving, onClick = { historicalChoice = null }) { Text("取消") } })
+        HistoricalCheckInDialog(calendar, date, completed, repository) { historicalChoice = null }
     }
     if (showDeleteConfirmation) {
         AlertDialog(
@@ -243,6 +230,47 @@ fun CalendarDetailScreen(
             dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }, enabled = !isDeleting) { Text("取消") } },
         )
     }
+}
+
+@Composable
+internal fun HistoricalCheckInDialog(
+    calendar: CalendarEntity,
+    date: LocalDate,
+    completed: Boolean,
+    repository: CalendarRepository,
+    onDismiss: () -> Unit,
+) {
+    var isSaving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text(if (completed) "撤销历史打卡？" else "补签这一天？") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("${calendar.name} · $date\n" + if (completed) "将移除这一天的完成记录，月度进度会重新计算。" else "确认这一天已完成，补签后会计入月度进度。")
+                if (saveError) Text("操作未完成，请重试。", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !isSaving, onClick = {
+                isSaving = true
+                saveError = false
+                repository.confirmedOperationScope.launch {
+                    try {
+                        if (completed) repository.undoHistoricalCheckIn(calendar.id, date) else repository.backfill(calendar.id, date)
+                        onDismiss()
+                    } catch (error: kotlinx.coroutines.CancellationException) {
+                        throw error
+                    } catch (_: Exception) {
+                        saveError = true
+                    } finally {
+                        isSaving = false
+                    }
+                }
+            }) { Text(if (completed) "确认撤销" else "确认补签") }
+        },
+        dismissButton = { TextButton(enabled = !isSaving, onClick = onDismiss) { Text("取消") } },
+    )
 }
 
 @Composable

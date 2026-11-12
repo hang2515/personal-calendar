@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.room.Room
 import com.hang2515.personalcalendar.data.*
 import com.hang2515.personalcalendar.ui.screens.CalendarDetailScreen
+import com.hang2515.personalcalendar.ui.screens.CalendarScreen
 import com.hang2515.personalcalendar.ui.theme.PersonalCalendarTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -25,6 +26,41 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class BackfillScreenTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun calendarTabCanBackfillAndUndoDirectlyFromTheMonthPreview() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), CalendarDatabase::class.java).build()
+        try {
+            val today = LocalDate.of(2026, 10, 12)
+            val calendar = CalendarEntity("preview", "阅读", "2026-10-01", 31)
+            val dao = database.calendarDao()
+            dao.insertCalendar(calendar)
+            dao.upsertScheduleChange(ScheduleChangeEntity(calendar.id, calendar.startDate, 31))
+            val repository = CalendarRepository(database, Clock.fixed(Instant.parse("2026-10-12T03:00:00Z"), ZoneId.of("Asia/Shanghai")))
+            compose.setContent { PersonalCalendarTheme {
+                CalendarScreen(repository, today, null, 0, 0, {})
+            } }
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithContentDescription("2026-10-09，未完成").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithContentDescription("2026-10-10，未安排").assertHasNoClickAction()
+            compose.onNodeWithContentDescription("2026-10-13，未来待完成").assertHasNoClickAction()
+            compose.onNodeWithContentDescription("2026-10-09，未完成").performClick()
+            compose.onNodeWithText("补签这一天？").assertIsDisplayed()
+            assertFalse(dao.hasCheckIn(calendar.id, "2026-10-09"))
+            compose.onNodeWithText("确认补签").performClick()
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithContentDescription("2026-10-09，已完成").fetchSemanticsNodes().isNotEmpty()
+            }
+            assertTrue(dao.hasCheckIn(calendar.id, "2026-10-09"))
+            compose.onNodeWithText("我的日历").assertExists()
+            compose.onNodeWithContentDescription("2026-10-09，已完成").performClick()
+            compose.onNodeWithText("确认撤销").performClick()
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithContentDescription("2026-10-09，未完成").fetchSemanticsNodes().isNotEmpty()
+            }
+            assertFalse(dao.hasCheckIn(calendar.id, "2026-10-09"))
+        } finally { database.close() }
+    }
 
     @Test fun missedDateRequiresConfirmationAndCompletedDateCanBeUndone() = runBlocking {
         val database = Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), CalendarDatabase::class.java).build()

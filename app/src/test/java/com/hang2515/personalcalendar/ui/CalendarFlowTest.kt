@@ -9,6 +9,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -17,6 +19,12 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
+import androidx.compose.ui.test.onParent
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.asAndroidBitmap
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import android.graphics.Bitmap
 import com.hang2515.personalcalendar.MainActivity
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
@@ -31,6 +39,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class CalendarFlowTest {
+    @org.junit.Before fun installSystemCalendar() { com.hang2515.personalcalendar.data.TestCalendarProvider.install() }
     private val remainingMonthDays: Int get() = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).let { it.lengthOfMonth() - it.dayOfMonth + 1 }
     @get:Rule(order = 0) val workManagerRule = object : ExternalResource() {
         override fun before() {
@@ -41,6 +50,16 @@ class CalendarFlowTest {
         }
     }
     @get:Rule(order = 1) val composeRule = createAndroidComposeRule<MainActivity>()
+
+    @Test fun calendarProjectionFailureIsVisibleOutsideReminderSettings() {
+        composeRule.runOnUiThread {
+            RuntimeEnvironment.getApplication().getSharedPreferences("reminder-notification-settings", 0)
+                .edit().putString("calendar_sync_error", "系统日历代管尚未更新").commit()
+        }
+        composeRule.onNodeWithText("系统提醒尚未更新，请到“我的 → 通知与提醒”检查。").assertIsDisplayed()
+        composeRule.onNodeWithText("检查提醒授权").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().assertIsDisplayed()
+    }
 
     @Test
     fun systemBackFromCreateReturnsToCalendarList() {
@@ -71,7 +90,40 @@ class CalendarFlowTest {
         org.robolectric.Shadows.shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
         composeRule.onNodeWithText("我的").performClick()
         composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
-        composeRule.onNodeWithText("打开通知设置").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("系统日历通知设置").performScrollTo().assertIsDisplayed().performClick()
+        org.junit.Assert.assertEquals(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS,
+            org.robolectric.Shadows.shadowOf(composeRule.activity).nextStartedActivity.action)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun notificationsCanBeTurnedOffAndBackOnWithoutRevokingSystemPermission() {
+        val application = RuntimeEnvironment.getApplication()
+        org.robolectric.Shadows.shadowOf(application).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        composeRule.onNodeWithText("我的").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("接收提醒通知").assertIsOn().performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("已关闭所有日历提醒").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("接收提醒通知").assertIsOff()
+        val screenshot = File("build/ui-preview/notifications-disabled.png")
+        screenshot.parentFile.mkdirs()
+        screenshot.outputStream().use {
+            composeRule.onNodeWithText("通知与提醒设置").onParent().onParent().captureToImage().asAndroidBitmap()
+                .compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        org.junit.Assert.assertEquals(android.content.pm.PackageManager.PERMISSION_GRANTED,
+            application.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS))
+        composeRule.onNodeWithText("知道了").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("接收提醒通知").assertIsOff().performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("已关闭所有日历提醒").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithContentDescription("接收提醒通知").assertIsOn()
+        composeRule.onNodeWithText("稍后设置").performClick()
+        composeRule.onNodeWithText("系统日历通知设置").performScrollTo().assertIsDisplayed().performClick()
         org.junit.Assert.assertEquals(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS,
             org.robolectric.Shadows.shadowOf(composeRule.activity).nextStartedActivity.action)
     }
@@ -81,9 +133,71 @@ class CalendarFlowTest {
         composeRule.onNodeWithText("日历").performClick()
         composeRule.onNodeWithContentDescription("新建日历").performClick()
         composeRule.onNode(isToggleable()).performScrollTo().performClick()
+        composeRule.onNodeWithText("稍后设置").performClick()
         composeRule.onNodeWithText("提醒时间：08:00").performScrollTo().performClick()
         composeRule.onNodeWithContentDescription("小时").assertExists()
         composeRule.onNodeWithContentDescription("分钟").assertExists()
+    }
+
+    @Test fun enablingNotificationsShowsSetupAndDoesNotClaimPermissionWasGranted() {
+        val application = RuntimeEnvironment.getApplication()
+        application.getSharedPreferences("reminder-notification-settings", 0).edit().putBoolean("enabled", false).commit()
+        org.robolectric.Shadows.shadowOf(application).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        composeRule.onNodeWithText("我的").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("接收提醒通知").assertIsOff().performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("设置提醒").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("允许访问系统日历").assertExists()
+        composeRule.onNodeWithText("稍后设置").performClick()
+        composeRule.onNodeWithText("系统日历尚未授权，提醒还未完成代管。").assertExists()
+        composeRule.onNodeWithContentDescription("闹钟提醒").assertIsOff()
+    }
+
+    @Test fun notificationSettingsTargetSystemCalendarInsteadOfOwnNotificationChannel() {
+        val application = RuntimeEnvironment.getApplication()
+        org.robolectric.Shadows.shadowOf(application).grantPermissions(android.Manifest.permission.READ_CALENDAR, android.Manifest.permission.WRITE_CALENDAR)
+        org.robolectric.Shadows.shadowOf(application).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        composeRule.onNodeWithText("我的").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithText("系统日历通知设置").performScrollTo().performClick()
+        val intent = org.robolectric.Shadows.shadowOf(composeRule.activity).nextStartedActivity
+        org.junit.Assert.assertEquals(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS, intent.action)
+        org.junit.Assert.assertEquals("test.calendar", intent.getStringExtra(android.provider.Settings.EXTRA_APP_PACKAGE))
+    }
+
+    @Test fun ordinarySetupCanTestWithoutExactPermission() {
+        val application = RuntimeEnvironment.getApplication()
+        application.getSharedPreferences("reminder-notification-settings", 0).edit().putBoolean("enabled", false).commit()
+        org.robolectric.Shadows.shadowOf(application).grantPermissions(android.Manifest.permission.READ_CALENDAR, android.Manifest.permission.WRITE_CALENDAR)
+        org.robolectric.Shadows.shadowOf(application).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        org.robolectric.shadows.ShadowAlarmManager.setCanScheduleExactAlarms(false)
+        composeRule.onNodeWithText("我的").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("接收提醒通知").performClick()
+        composeRule.waitUntil(10_000) { composeRule.onAllNodesWithText("设置提醒").fetchSemanticsNodes().isNotEmpty() }
+        composeRule.onNodeWithText("开始后台测试").performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("测试已写入系统日历，请返回桌面或锁屏，约 1 分钟后检查。").fetchSemanticsNodes().isNotEmpty()
+        }
+        org.junit.Assert.assertNull(application.getSystemService(android.app.AlarmManager::class.java).nextAlarmClock)
+    }
+
+    @Test fun lateTestDeliveryUpdatesVisibleUnconfirmedResultWithoutReopening() {
+        val application = RuntimeEnvironment.getApplication()
+        org.robolectric.Shadows.shadowOf(application).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        val preferences = application.getSharedPreferences("reminder-notification-settings", 0)
+        preferences.edit().putString("test_token", "late-test").putLong("test_expected_at", System.currentTimeMillis() - 600_000)
+            .putLong("test_posted_at", 0).putBoolean("test_delegated", true).commit()
+        composeRule.onNodeWithText("我的").performClick()
+        composeRule.onNodeWithText("通知与提醒").performScrollTo().performClick()
+        composeRule.onNodeWithText("尚未确认收到，请检查系统日历通知设置后重试。").performScrollTo().assertIsDisplayed()
+        composeRule.runOnIdle { preferences.edit().putLong("test_posted_at", System.currentTimeMillis()).commit() }
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("你已确认收到系统日历测试提醒。").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("尚未确认收到，请检查系统日历通知设置后重试。").assertDoesNotExist()
     }
 
     @Test

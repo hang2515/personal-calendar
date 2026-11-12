@@ -38,6 +38,15 @@ interface CalendarDao {
     @Query("SELECT id FROM calendars")
     suspend fun getCalendarIds(): List<String>
 
+    @Query("SELECT id, name, startDate, weekdayMask, isPaused, reminderMinute, reminderEnabled, iconKey, colorKey FROM calendars ORDER BY id")
+    suspend fun getReminderCalendars(): List<CalendarEntity>
+
+    @Query("SELECT calendarId, effectiveDate, weekdayMask FROM schedule_changes WHERE (:calendarId IS NULL OR calendarId = :calendarId) AND (effectiveDate >= :from OR effectiveDate = (SELECT MAX(previous.effectiveDate) FROM schedule_changes AS previous WHERE previous.calendarId = schedule_changes.calendarId AND previous.effectiveDate < :from)) ORDER BY calendarId, effectiveDate")
+    suspend fun getReminderChanges(from: String, calendarId: String?): List<ScheduleChangeEntity>
+
+    @Query("SELECT calendarId, localDate FROM check_ins WHERE localDate = :date")
+    suspend fun getReminderCheckIns(date: String): List<CheckInEntity>
+
     @Insert
     suspend fun insertCalendar(calendar: CalendarEntity)
 

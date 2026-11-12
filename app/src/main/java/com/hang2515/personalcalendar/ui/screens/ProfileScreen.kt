@@ -70,7 +70,7 @@ fun ProfileScreen(permissionRevision: Int, modifier: Modifier = Modifier) {
         CloudBackupCard(onAccountChanged = accountChanged, onOpenSettings = { showBackupSettings = true })
         Text("偏好与支持", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            ProfileSetting("通知与提醒", "权限与准时提醒", Icons.Outlined.Notifications, onClick = { section = "notifications" })
+            ProfileSetting("通知与提醒", "通知、闹钟与后台提醒测试", Icons.Outlined.Notifications, onClick = { section = "notifications" })
             HorizontalDivider(Modifier.padding(horizontal = 18.dp), color = MaterialTheme.colorScheme.outlineVariant)
             ProfileSetting("时区设置", "北京时间", Icons.Outlined.DateRange, onClick = { section = "timezone" })
             HorizontalDivider(Modifier.padding(horizontal = 18.dp), color = MaterialTheme.colorScheme.outlineVariant)

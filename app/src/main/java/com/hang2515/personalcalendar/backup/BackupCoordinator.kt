@@ -88,8 +88,7 @@ class BackupCoordinator private constructor(private val context: Context) {
         val previousIds = local.restore(backup.body, account, backup.etag, preview.revision)
         BackupWork.cancel(context); pending.delete(); recordError(null)
         val reminders = ReminderScheduler.open(context)
-        previousIds.forEach { reminders.dismissNotification(it); reminders.refresh(it) }
-        reminders.refreshAll()
+        reminders.refreshAfterRestore(previousIds)
     }
 
     suspend fun stop(signOut: Boolean) = mutex.withLock {

@@ -1,6 +1,11 @@
 package com.hang2515.personalcalendar.ui
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Icon
@@ -12,6 +17,7 @@ import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.hang2515.personalcalendar.data.CalendarRepository
+import com.hang2515.personalcalendar.reminders.ReminderScheduler
 import com.hang2515.personalcalendar.ui.screens.CalendarScreen
 import com.hang2515.personalcalendar.ui.screens.ProfileScreen
 import com.hang2515.personalcalendar.ui.screens.TodayScreen
@@ -42,6 +49,9 @@ fun PersonalCalendarApp(openCalendarId: String?, openRequest: Int, permissionRev
     var selectedTab by rememberSaveable { mutableStateOf(if (openCalendarId == null) MainTab.TODAY else MainTab.CALENDARS) }
     val context = LocalContext.current
     val repository = remember { CalendarRepository.open(context) }
+    val scheduler = remember { ReminderScheduler.open(context) }
+    val calendarErrorFlow = remember(scheduler) { scheduler.observeCalendarSyncError() }
+    val calendarError by calendarErrorFlow.collectAsState(initial = scheduler.calendarSyncError())
     val today by produceState(initialValue = LocalDate.now(ZoneId.of("Asia/Shanghai"))) {
         while (true) {
             value = LocalDate.now(ZoneId.of("Asia/Shanghai"))
@@ -54,6 +64,14 @@ fun PersonalCalendarApp(openCalendarId: String?, openRequest: Int, permissionRev
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            if (calendarError != null) Surface(color = MaterialTheme.colorScheme.errorContainer) {
+                Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text("系统提醒尚未更新，请到“我的 → 通知与提醒”检查。")
+                    TextButton(onClick = { selectedTab = MainTab.PROFILE }) { Text("检查提醒授权") }
+                }
+            }
+        },
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                 MainTab.entries.forEach { tab ->

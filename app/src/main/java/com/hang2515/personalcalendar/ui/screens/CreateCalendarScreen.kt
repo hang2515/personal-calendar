@@ -128,7 +128,7 @@ fun CreateCalendarScreen(
                         Text("调整 ›", style = MaterialTheme.typography.labelLarge)
                     }
                 }
-                ReminderPermissionCard(permissionRevision)
+                ReminderPermissionCard(permissionRevision, requestSetupOnEnter = calendar?.reminderEnabled != true)
             }
         }
         FormCard {

@@ -11,11 +11,14 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.hang2515.personalcalendar"
+        applicationId = "com.hang2515.personalcalendar" + if (providers.gradleProperty("independentInstall").orNull == "true") ".next" else ""
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.4.0"
+        versionCode = 10
+        versionName = "0.4.4"
+        if (providers.gradleProperty("independentInstall").orNull == "true") {
+            resValue("string", "app_name", "个人日历（新版）")
+        }
         manifestPlaceholders["appAuthRedirectScheme"] = "com.hang2515.personalcalendar"
         val cloudSettings = Properties().apply {
             val file = rootProject.file("cloud-config.properties")
@@ -31,6 +34,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 
     compileOptions {

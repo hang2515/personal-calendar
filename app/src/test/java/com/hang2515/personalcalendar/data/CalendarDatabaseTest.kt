@@ -26,6 +26,11 @@ import java.time.ZoneId
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class CalendarDatabaseTest {
+    @org.junit.Before fun enableOptionalAlarmMarkerForAlarmRegressions() {
+        RuntimeEnvironment.getApplication().getSharedPreferences("reminder-notification-settings", 0).edit()
+            .putBoolean("alarm_clock", true).commit()
+        org.robolectric.shadows.ShadowAlarmManager.setCanScheduleExactAlarms(true)
+    }
     @Test
     fun monthlyCardsRespectEachCalendarHistoryAndExcludeFutureAndUnscheduledCheckIns() = runBlocking {
         val database = Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), CalendarDatabase::class.java).build()
@@ -82,7 +87,7 @@ class CalendarDatabaseTest {
     }
 
     @Test
-    fun dueReminderPostsNotificationOnlyBeforeCheckIn() = runBlocking {
+    fun dueReminderDoesNotPostAppNotificationWhenCalendarAccessIsMissing() = runBlocking {
         val context = RuntimeEnvironment.getApplication()
         Shadows.shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         val database = Room.inMemoryDatabaseBuilder(context, CalendarDatabase::class.java).build()
@@ -93,18 +98,9 @@ class CalendarDatabaseTest {
         try {
             database.calendarDao().insertCalendar(CalendarEntity("one", "阅读", today.toString(), 127, reminderEnabled = true))
             database.calendarDao().upsertScheduleChange(ScheduleChangeEntity("one", today.toString(), 127))
-            scheduler.deliver("one")
-            assertEquals(1, notifications.allNotifications.size)
-            assertEquals(
-                "one",
-                Shadows.shadowOf(notifications.allNotifications.single().contentIntent)
-                    .savedIntent.getStringExtra(ReminderScheduler.EXTRA_CALENDAR_ID),
-            )
-
-            database.calendarDao().insertCheckIn(CheckInEntity("one", today.toString()))
-            context.getSystemService(NotificationManager::class.java).cancelAll()
-            scheduler.deliver("one")
+            scheduler.refresh("one")
             assertEquals(0, notifications.allNotifications.size)
+            assertNotNull(scheduler.calendarSyncError())
         } finally {
             database.close()
         }
